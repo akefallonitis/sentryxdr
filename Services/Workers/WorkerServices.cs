@@ -145,57 +145,5 @@ namespace SentryXDR.Services.Workers
     }
 
     // ==================== Azure Security ====================
-    public interface IAzureApiService
-    {
-        Task<XDRRemediationResponse> StopVMAsync(XDRRemediationRequest request);
-        Task<XDRRemediationResponse> IsolateVMNetworkAsync(XDRRemediationRequest request);
-        Task<XDRRemediationResponse> CreateNSGRuleAsync(XDRRemediationRequest request);
-    }
-
-    public interface IAzureWorkerService : IAzureApiService { }
-    
-    public class AzureApiService : IAzureApiService
-    {
-        public async Task<XDRRemediationResponse> StopVMAsync(XDRRemediationRequest request)
-        {
-            return await Task.FromResult(new XDRRemediationResponse
-            {
-                RequestId = request.RequestId,
-                Success = true,
-                Status = "Pending",
-                Message = "VM stopped - Azure implementation pending"
-            });
-        }
-
-        public async Task<XDRRemediationResponse> IsolateVMNetworkAsync(XDRRemediationRequest request)
-        {
-            return await Task.FromResult(new XDRRemediationResponse
-            {
-                RequestId = request.RequestId,
-                Success = true,
-                Status = "Pending",
-                Message = "VM network isolated - Azure implementation pending"
-            });
-        }
-
-        public async Task<XDRRemediationResponse> CreateNSGRuleAsync(XDRRemediationRequest request)
-        {
-            return await Task.FromResult(new XDRRemediationResponse
-            {
-                RequestId = request.RequestId,
-                Success = true,
-                Status = "Pending",
-                Message = "NSG rule created - Azure implementation pending"
-            });
-        }
-    }
-
-    public class AzureWorkerService : IAzureWorkerService
-    {
-        private readonly IAzureApiService _apiService;
-        public AzureWorkerService(IAzureApiService apiService) => _apiService = apiService;
-        public Task<XDRRemediationResponse> StopVMAsync(XDRRemediationRequest request) => _apiService.StopVMAsync(request);
-        public Task<XDRRemediationResponse> IsolateVMNetworkAsync(XDRRemediationRequest request) => _apiService.IsolateVMNetworkAsync(request);
-        public Task<XDRRemediationResponse> CreateNSGRuleAsync(XDRRemediationRequest request) => _apiService.CreateNSGRuleAsync(request);
-    }
+    // Azure API stub interfaces removed - see AzureApiService.cs for full implementation
 }

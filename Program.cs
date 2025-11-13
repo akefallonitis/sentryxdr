@@ -20,31 +20,37 @@ var host = new HostBuilder()
         
         // Multi-tenant authentication
         services.AddSingleton<IMultiTenantAuthService, MultiTenantAuthService>();
+        
+        // Managed Identity authentication
+        services.AddSingleton<IManagedIdentityAuthService, ManagedIdentityAuthService>();
+        
         services.AddSingleton<IGraphServiceFactory, GraphServiceFactory>();
         
         // HTTP clients for all services
         services.AddHttpClient<IMDEApiService, MDEApiService>();
-        services.AddHttpClient<MDOApiService>();  // MDOApiService is registered as itself
-        services.AddHttpClient<EntraIDApiService>();  // EntraIDApiService is registered as itself
-        services.AddHttpClient<IntuneApiService>();  // IntuneApiService is registered as itself
+        services.AddHttpClient<MDOApiService>();
+        services.AddHttpClient<EntraIDApiService>();
+        services.AddHttpClient<IntuneApiService>();
         services.AddHttpClient<IMCASApiService, MCASApiService>();
         services.AddHttpClient<IMDIApiService, MDIApiService>();
-        services.AddHttpClient<IAzureApiService, AzureApiService>();
         
-        // Worker services (these wrap the API services)
+        // ? Azure Worker (NEW)
+        services.AddHttpClient<IAzureWorkerService, AzureWorkerService>();
+        services.AddScoped<IAzureWorkerService, AzureWorkerService>();
+        
+        // Worker services
         services.AddScoped<IMDEWorkerService, MDEWorkerService>();
-        services.AddScoped<IMDOApiService, MDOApiService>();  // Register as IMDOApiService
-        services.AddScoped<IMDOWorkerService>(sp => sp.GetRequiredService<IMDOApiService>() as IMDOWorkerService);  // Alias to IMDOWorkerService
-        services.AddScoped<IEntraIDWorkerService, EntraIDApiService>();  // EntraIDApiService implements IEntraIDWorkerService
-        services.AddScoped<IIntuneWorkerService, IntuneApiService>();  // IntuneApiService implements IIntuneWorkerService
+        services.AddScoped<IMDOApiService, MDOApiService>();
+        services.AddScoped<IMDOWorkerService>(sp => sp.GetRequiredService<IMDOApiService>() as IMDOWorkerService);
+        services.AddScoped<IEntraIDWorkerService, EntraIDApiService>();
+        services.AddScoped<IIntuneWorkerService, IntuneApiService>();
         services.AddScoped<IMCASWorkerService, MCASWorkerService>();
         services.AddScoped<IMDIWorkerService, MDIWorkerService>();
-        services.AddScoped<IAzureWorkerService, AzureWorkerService>();
         
         // Storage services
         services.AddSingleton<IAuditLogService, AuditLogService>();
         services.AddSingleton<IStorageService, StorageService>();
-        services.AddSingleton<IHistoryService, HistoryService>();  // ? History tracking
+        services.AddSingleton<IHistoryService, HistoryService>();
         
         // Blob Service Client
         services.AddSingleton(sp =>
@@ -54,7 +60,7 @@ var host = new HostBuilder()
             return new BlobServiceClient(connectionString);
         });
         
-        // Table Service Client ? For history storage
+        // Table Service Client
         services.AddSingleton(sp =>
         {
             var connectionString = configuration["Storage:ConnectionString"] 
