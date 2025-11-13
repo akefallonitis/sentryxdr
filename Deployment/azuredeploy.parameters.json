@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "functionAppName": {
+      "value": "sentryxdr-prod"
+    },
+    "multiTenantClientId": {
+      "value": "YOUR_CLIENT_ID_HERE"
+    },
+    "multiTenantClientSecret": {
+      "value": "YOUR_CLIENT_SECRET_HERE"
+    },
+    "storageAccountType": {
+      "value": "Standard_LRS"
+    }
+  }
+}

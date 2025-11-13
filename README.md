@@ -1,2 +1,0 @@
-# sentryxdr
-sentry xsoar actions
