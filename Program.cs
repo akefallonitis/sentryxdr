@@ -7,6 +7,7 @@ using SentryXDR.Services.Authentication;
 using SentryXDR.Services.Workers;
 using SentryXDR.Services.Storage;
 using Azure.Storage.Blobs;
+using Azure.Data.Tables;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults()
@@ -43,6 +44,7 @@ var host = new HostBuilder()
         // Storage services
         services.AddSingleton<IAuditLogService, AuditLogService>();
         services.AddSingleton<IStorageService, StorageService>();
+        services.AddSingleton<IHistoryService, HistoryService>();  // ? History tracking
         
         // Blob Service Client
         services.AddSingleton(sp =>
@@ -50,6 +52,14 @@ var host = new HostBuilder()
             var connectionString = configuration["Storage:ConnectionString"] 
                 ?? configuration["AzureWebJobsStorage"];
             return new BlobServiceClient(connectionString);
+        });
+        
+        // Table Service Client ? For history storage
+        services.AddSingleton(sp =>
+        {
+            var connectionString = configuration["Storage:ConnectionString"] 
+                ?? configuration["AzureWebJobsStorage"];
+            return new TableServiceClient(connectionString);
         });
         
         // Validation services

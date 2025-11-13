@@ -150,5 +150,163 @@ namespace SentryXDR.Functions
 
             return response;
         }
+
+        [Function("DefenderXDROrchestrator")]
+        public async Task<XDRRemediationResponse> RunOrchestrator(
+            [OrchestrationTrigger] TaskOrchestrationContext context)
+        {
+            var request = context.GetInput<XDRRemediationRequest>();
+            var logger = context.CreateReplaySafeLogger<XDROrchestrator>();
+            var startTime = context.CurrentUtcDateTime;
+            
+            logger.LogInformation("Orchestrator started for {Action} on platform {Platform}", 
+                request.Action, request.Platform);
+
+            try
+            {
+                // ? Create history entry at start
+                var historyEntry = new RemediationHistoryEntry
+                {
+                    RequestId = request.RequestId,
+                    OrchestrationId = context.InstanceId,
+                    TenantId = request.TenantId,
+                    IncidentId = request.IncidentId,
+                    Platform = request.Platform,
+                    Action = request.Action,
+                    Parameters = request.Parameters,
+                    InitiatedBy = request.InitiatedBy,
+                    Priority = request.Priority,
+                    Justification = request.Justification,
+                    Status = "InProgress",
+                    InitiatedAt = startTime
+                };
+
+                // ? Record history start
+                await context.CallActivityAsync("RecordHistoryActivity", historyEntry);
+
+                // Validate the request
+                var validationResult = await context.CallActivityAsync<bool>("ValidateRemediationRequest", request);
+                
+                if (!validationResult)
+                {
+                    historyEntry.Status = "ValidationFailed";
+                    historyEntry.Success = false;
+                    historyEntry.CompletedAt = context.CurrentUtcDateTime;
+                    historyEntry.Duration = context.CurrentUtcDateTime - startTime;
+                    historyEntry.ErrorMessage = "Request validation failed";
+                    
+                    // ? Update history
+                    await context.CallActivityAsync("RecordHistoryActivity", historyEntry);
+                    
+                    return new XDRRemediationResponse
+                    {
+                        RequestId = request.RequestId,
+                        Success = false,
+                        Status = "ValidationFailed",
+                        Message = "Request validation failed"
+                    };
+                }
+
+                // Route to appropriate worker
+                var workerName = request.Platform switch
+                {
+                    XDRPlatform.MDE => "MDEWorkerActivity",
+                    XDRPlatform.MDO => "MDOWorkerActivity",
+                    XDRPlatform.EntraID => "EntraIDWorkerActivity",
+                    XDRPlatform.Intune => "IntuneWorkerActivity",
+                    XDRPlatform.MCAS => "MCASWorkerActivity",
+                    XDRPlatform.Azure => "AzureWorkerActivity",
+                    XDRPlatform.MDI => "MDIWorkerActivity",
+                    _ => null
+                };
+
+                if (workerName == null)
+                {
+                    historyEntry.Status = "PlatformNotSupported";
+                    historyEntry.Success = false;
+                    historyEntry.CompletedAt = context.CurrentUtcDateTime;
+                    historyEntry.Duration = context.CurrentUtcDateTime - startTime;
+                    historyEntry.ErrorMessage = $"Platform {request.Platform} not supported";
+                    
+                    await context.CallActivityAsync("RecordHistoryActivity", historyEntry);
+                    
+                    return new XDRRemediationResponse
+                    {
+                        RequestId = request.RequestId,
+                        Success = false,
+                        Status = "PlatformNotSupported",
+                        Message = $"Platform {request.Platform} not supported"
+                    };
+                }
+
+                var response = await context.CallActivityAsync<XDRRemediationResponse>(workerName, request);
+
+                // ? Update history with result
+                historyEntry.Status = response.Success ? "Completed" : "Failed";
+                historyEntry.Success = response.Success;
+                historyEntry.CompletedAt = context.CurrentUtcDateTime;
+                historyEntry.Duration = context.CurrentUtcDateTime - startTime;
+                historyEntry.ErrorMessage = response.Success ? null : response.Message;
+                historyEntry.Errors = response.Errors;
+                historyEntry.Details = response.Details;
+                
+                await context.CallActivityAsync("RecordHistoryActivity", historyEntry);
+
+                // Log the audit entry
+                await context.CallActivityAsync("LogAuditEntry", new AuditLogEntry
+                {
+                    TenantId = request.TenantId,
+                    RequestId = request.RequestId,
+                    IncidentId = request.IncidentId,
+                    Action = request.Action,
+                    Platform = request.Platform,
+                    InitiatedBy = request.InitiatedBy,
+                    Justification = request.Justification,
+                    Success = response.Success,
+                    Result = response.Status,
+                    TargetResource = request.Parameters.ContainsKey("deviceId") 
+                        ? request.Parameters["deviceId"]?.ToString() ?? "unknown"
+                        : request.Parameters.ContainsKey("userId")
+                            ? request.Parameters["userId"]?.ToString() ?? "unknown"
+                            : "unknown",
+                    Details = response.Details ?? new Dictionary<string, object>(),
+                    Timestamp = context.CurrentUtcDateTime
+                });
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Orchestrator failed: {Error}", ex.Message);
+                
+                // ? Record failure in history
+                var historyEntry = new RemediationHistoryEntry
+                {
+                    RequestId = request.RequestId,
+                    OrchestrationId = context.InstanceId,
+                    TenantId = request.TenantId,
+                    IncidentId = request.IncidentId,
+                    Platform = request.Platform,
+                    Action = request.Action,
+                    Status = "Exception",
+                    Success = false,
+                    CompletedAt = context.CurrentUtcDateTime,
+                    Duration = context.CurrentUtcDateTime - startTime,
+                    ErrorMessage = ex.Message,
+                    Errors = new List<string> { ex.ToString() }
+                };
+                
+                await context.CallActivityAsync("RecordHistoryActivity", historyEntry);
+                
+                return new XDRRemediationResponse
+                {
+                    RequestId = request.RequestId,
+                    Success = false,
+                    Status = "Exception",
+                    Message = $"Orchestration failed: {ex.Message}",
+                    Errors = new List<string> { ex.ToString() }
+                };
+            }
+        }
     }
 }

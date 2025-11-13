@@ -11,6 +11,7 @@
     <Description>Multi-tenant Microsoft XDR Automated Remediation Platform</Description>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Azure.Data.Tables" Version="12.11.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.21.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.1.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.DurableTask" Version="1.1.0" />

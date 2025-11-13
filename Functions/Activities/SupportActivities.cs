@@ -14,15 +14,18 @@ namespace SentryXDR.Functions.Activities
         private readonly ILogger<SupportActivities> _logger;
         private readonly IRemediationValidator _validator;
         private readonly IAuditLogService _auditLogService;
+        private readonly IHistoryService _historyService;
 
         public SupportActivities(
             ILogger<SupportActivities> logger,
             IRemediationValidator validator,
-            IAuditLogService auditLogService)
+            IAuditLogService auditLogService,
+            IHistoryService historyService)
         {
             _logger = logger;
             _validator = validator;
             _auditLogService = auditLogService;
+            _historyService = historyService;
         }
 
         [Function("ValidateRemediationActivity")]
@@ -74,6 +77,28 @@ namespace SentryXDR.Functions.Activities
             // - PagerDuty for critical alerts
 
             await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Record history entry for action tracking
+        /// </summary>
+        [Function("RecordHistoryActivity")]
+        public async Task RecordHistoryAsync(
+            [ActivityTrigger] RemediationHistoryEntry entry)
+        {
+            _logger.LogInformation("Recording history for request: {RequestId}, Status: {Status}",
+                entry.RequestId, entry.Status);
+
+            try
+            {
+                await _historyService.AddHistoryEntryAsync(entry);
+                _logger.LogInformation("History recorded successfully for request: {RequestId}", entry.RequestId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to record history for request: {RequestId}", entry.RequestId);
+                // Don't throw - history recording shouldn't fail the orchestration
+            }
         }
     }
 }
