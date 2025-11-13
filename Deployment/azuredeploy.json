@@ -207,6 +207,14 @@
               "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName')), '2020-02-02').ConnectionString]"
             },
             {
+              "name": "ApplicationInsights:ConnectionString",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('applicationInsightsName')), '2020-02-02').InstrumentationKey]"
+            },
+            {
               "name": "MultiTenant:ClientId",
               "value": "[parameters('multiTenantClientId')]"
             },
@@ -249,6 +257,14 @@
             {
               "name": "Storage:RemediationQueue",
               "value": "xdr-remediation-queue"
+            },
+            {
+              "name": "Storage:ReportsContainer",
+              "value": "xdr-reports"
+            },
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "1"
             }
           ]
         },
