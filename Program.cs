@@ -21,19 +21,23 @@ var host = new HostBuilder()
         services.AddSingleton<IMultiTenantAuthService, MultiTenantAuthService>();
         services.AddSingleton<IGraphServiceFactory, GraphServiceFactory>();
         
-        // HTTP clients
+        // HTTP clients for all services
         services.AddHttpClient<IMDEApiService, MDEApiService>();
-        services.AddHttpClient<IMDOApiService, MDOApiService>();
+        services.AddHttpClient<MDOApiService>();  // MDOApiService is registered as itself
+        services.AddHttpClient<EntraIDApiService>();  // EntraIDApiService is registered as itself
+        services.AddHttpClient<IntuneApiService>();  // IntuneApiService is registered as itself
         services.AddHttpClient<IMCASApiService, MCASApiService>();
         services.AddHttpClient<IMDIApiService, MDIApiService>();
+        services.AddHttpClient<IAzureApiService, AzureApiService>();
         
-        // Worker services
+        // Worker services (these wrap the API services)
         services.AddScoped<IMDEWorkerService, MDEWorkerService>();
-        services.AddScoped<IMDOWorkerService, MDOWorkerService>();
+        services.AddScoped<IMDOApiService, MDOApiService>();  // Register as IMDOApiService
+        services.AddScoped<IMDOWorkerService>(sp => sp.GetRequiredService<IMDOApiService>() as IMDOWorkerService);  // Alias to IMDOWorkerService
+        services.AddScoped<IEntraIDWorkerService, EntraIDApiService>();  // EntraIDApiService implements IEntraIDWorkerService
+        services.AddScoped<IIntuneWorkerService, IntuneApiService>();  // IntuneApiService implements IIntuneWorkerService
         services.AddScoped<IMCASWorkerService, MCASWorkerService>();
         services.AddScoped<IMDIWorkerService, MDIWorkerService>();
-        services.AddScoped<IEntraIDWorkerService, EntraIDWorkerService>();
-        services.AddScoped<IIntuneWorkerService, IntuneWorkerService>();
         services.AddScoped<IAzureWorkerService, AzureWorkerService>();
         
         // Storage services
@@ -43,7 +47,8 @@ var host = new HostBuilder()
         // Blob Service Client
         services.AddSingleton(sp =>
         {
-            var connectionString = configuration["Storage:ConnectionString"];
+            var connectionString = configuration["Storage:ConnectionString"] 
+                ?? configuration["AzureWebJobsStorage"];
             return new BlobServiceClient(connectionString);
         });
         
