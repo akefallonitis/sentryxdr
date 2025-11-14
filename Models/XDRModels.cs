@@ -425,7 +425,13 @@ namespace SentryXDR.Models
         UploadScriptToLibrary,                  // POST /libraryfiles
         GetLiveResponseResults,                 // GET /machineactions/{id}/GetLiveResponseResultDownloadLink
         PutFileToDevice,                        // POST /machines/{id}/putfile
-        GetFileFromDevice                       // POST /machines/{id}/getfile
+        GetFileFromDevice,                      // POST /machines/{id}/getfile
+        
+        // ==================== Enhanced Incident Management (3 NEW) ?? ====================
+        // Microsoft Graph Security API - Extended incident operations
+        MergeAlertsIntoIncident,                // POST /security/incidents/{id}/alerts - Merge alerts into existing incident
+        CreateIncidentFromAlert,                // POST /security/incidents - Create new incident from single alert
+        CreateIncidentFromAlerts                // POST /security/incidents - Create new incident from multiple correlated alerts (bulk)
     }
 
     /// <summary>
