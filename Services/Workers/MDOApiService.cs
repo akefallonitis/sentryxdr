@@ -600,6 +600,163 @@ namespace SentryXDR.Services.Workers
             }
         }
 
+        // ==================== File Detonation (4 actions) ====================
+
+        public async Task<XDRRemediationResponse> SubmitFileForDetonationAsync(XDRRemediationRequest request)
+        {
+            var startTime = DateTime.UtcNow;
+            await SetAuthHeaderAsync(request.TenantId);
+
+            var fileName = request.Parameters["fileName"]?.ToString();
+            var fileContent = request.Parameters["fileContent"]?.ToString(); // Base64
+
+            try
+            {
+                var submissionBody = new
+                {
+                    contentData = fileContent,
+                    fileName = fileName,
+                    category = "malware"
+                };
+
+                var response = await _httpClient.PostAsync(
+                    $"{_graphBaseUrl}/security/threatSubmission/fileContentThreats",
+                    new StringContent(JsonSerializer.Serialize(submissionBody), Encoding.UTF8, "application/json"));
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var submission = JsonSerializer.Deserialize<JsonElement>(content);
+                    
+                    return CreateSuccessResponse(request, $"File '{fileName}' submitted for detonation analysis",
+                        new Dictionary<string, object>
+                        {
+                            ["submissionId"] = submission.GetProperty("id").GetString()!,
+                            ["status"] = submission.GetProperty("status").GetString()!,
+                            ["fileName"] = fileName!
+                        }, startTime);
+                }
+
+                return CreateFailureResponse(request, $"Failed to submit file: {response.ReasonPhrase}",
+                    await response.Content.ReadAsStringAsync(), startTime);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting file for detonation");
+                return CreateExceptionResponse(request, ex, startTime);
+            }
+        }
+
+        public async Task<XDRRemediationResponse> GetDetonationReportAsync(XDRRemediationRequest request)
+        {
+            var startTime = DateTime.UtcNow;
+            await SetAuthHeaderAsync(request.TenantId);
+
+            var submissionId = request.Parameters["submissionId"]?.ToString();
+
+            try
+            {
+                var response = await _httpClient.GetAsync(
+                    $"{_graphBaseUrl}/security/threatSubmission/fileContentThreats/{submissionId}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var report = JsonSerializer.Deserialize<JsonElement>(content);
+                    
+                    return CreateSuccessResponse(request, "Detonation report retrieved",
+                        new Dictionary<string, object>
+                        {
+                            ["report"] = report.ToString(),
+                            ["status"] = report.GetProperty("status").GetString()!,
+                            ["submissionId"] = submissionId!
+                        }, startTime);
+                }
+
+                return CreateFailureResponse(request, $"Failed to get report: {response.ReasonPhrase}",
+                    await response.Content.ReadAsStringAsync(), startTime);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting detonation report");
+                return CreateExceptionResponse(request, ex, startTime);
+            }
+        }
+
+        public async Task<XDRRemediationResponse> SubmitURLForDetonationAsync(XDRRemediationRequest request)
+        {
+            var startTime = DateTime.UtcNow;
+            await SetAuthHeaderAsync(request.TenantId);
+
+            var url = request.Parameters["url"]?.ToString();
+
+            try
+            {
+                var submissionBody = new
+                {
+                    url = url,
+                    category = "phishing"
+                };
+
+                var response = await _httpClient.PostAsync(
+                    $"{_graphBaseUrl}/security/threatSubmission/urlThreats",
+                    new StringContent(JsonSerializer.Serialize(submissionBody), Encoding.UTF8, "application/json"));
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var submission = JsonSerializer.Deserialize<JsonElement>(content);
+                    
+                    return CreateSuccessResponse(request, $"URL '{url}' submitted for detonation analysis",
+                        new Dictionary<string, object>
+                        {
+                            ["submissionId"] = submission.GetProperty("id").GetString()!,
+                            ["url"] = url!
+                        }, startTime);
+                }
+
+                return CreateFailureResponse(request, $"Failed to submit URL: {response.ReasonPhrase}",
+                    await response.Content.ReadAsStringAsync(), startTime);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting URL for detonation");
+                return CreateExceptionResponse(request, ex, startTime);
+            }
+        }
+
+        public async Task<XDRRemediationResponse> RemoveEmailFromQuarantineAsync(XDRRemediationRequest request)
+        {
+            var startTime = DateTime.UtcNow;
+            await SetAuthHeaderAsync(request.TenantId);
+
+            var quarantineMessageId = request.Parameters["quarantineMessageId"]?.ToString();
+
+            try
+            {
+                var response = await _httpClient.PostAsync(
+                    $"{_graphBaseUrl}/security/quarantine/messages/{quarantineMessageId}/release",
+                    null);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return CreateSuccessResponse(request, "Email released from quarantine",
+                        new Dictionary<string, object>
+                        {
+                            ["quarantineMessageId"] = quarantineMessageId!
+                        }, startTime);
+                }
+
+                return CreateFailureResponse(request, $"Failed to release email: {response.ReasonPhrase}",
+                    await response.Content.ReadAsStringAsync(), startTime);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error releasing email from quarantine");
+                return CreateExceptionResponse(request, ex, startTime);
+            }
+        }
+
         // ==================== Helper Methods ====================
 
         private XDRRemediationResponse CreateFailureResponse(
@@ -640,6 +797,27 @@ namespace SentryXDR.Services.Workers
                 Status = "Exception",
                 Message = $"Exception occurred: {ex.Message}",
                 Errors = new List<string> { ex.ToString() },
+                CompletedAt = DateTime.UtcNow,
+                Duration = DateTime.UtcNow - startTime
+            };
+        }
+
+        private XDRRemediationResponse CreateSuccessResponse(
+            XDRRemediationRequest request,
+            string message,
+            Dictionary<string, object> details,
+            DateTime startTime)
+        {
+            return new XDRRemediationResponse
+            {
+                RequestId = request.RequestId,
+                TenantId = request.TenantId,
+                IncidentId = request.IncidentId,
+                Success = true,
+                Status = "Completed",
+                Message = message,
+                Details = details,
+                ActionId = details.ContainsKey("submissionId") ? details["submissionId"]?.ToString() : null,
                 CompletedAt = DateTime.UtcNow,
                 Duration = DateTime.UtcNow - startTime
             };

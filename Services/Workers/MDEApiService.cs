@@ -19,6 +19,8 @@ namespace SentryXDR.Services.Workers
         Task<XDRRemediationResponse> RemoveAppRestrictionAsync(XDRRemediationRequest request);
         Task<XDRRemediationResponse> StartAutomatedInvestigationAsync(XDRRemediationRequest request);
         Task<XDRRemediationResponse> SubmitIndicatorAsync(XDRRemediationRequest request);
+        Task<XDRRemediationResponse> InitiateAutomatedInvestigationAsync(XDRRemediationRequest request);
+        Task<XDRRemediationResponse> CancelMachineActionAsync(XDRRemediationRequest request);
     }
 
     /// <summary>
@@ -566,6 +568,145 @@ namespace SentryXDR.Services.Workers
                 CompletedAt = DateTime.UtcNow,
                 Duration = DateTime.UtcNow - startTime
             };
+        }
+
+        // ==================== Enhanced MDE Actions (2 NEW actions) ====================
+        // NOTE: CollectInvestigationPackageAsync already exists above
+        
+        public async Task<XDRRemediationResponse> InitiateAutomatedInvestigationAsync(XDRRemediationRequest request)
+        {
+            var startTime = DateTime.UtcNow;
+            await SetAuthHeaderAsync(request.TenantId);
+
+            var machineId = request.Parameters["machineId"]?.ToString();
+            var comment = request.Parameters["comment"]?.ToString() ?? "Initiating automated investigation via SentryXDR";
+
+            try
+            {
+                var actionBody = new { Comment = comment };
+                var response = await _httpClient.PostAsync(
+                    $"{_baseUrl}/api/machines/{machineId}/startInvestigation",
+                    new StringContent(JsonSerializer.Serialize(actionBody), Encoding.UTF8, "application/json"));
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var investigation = JsonSerializer.Deserialize<JsonElement>(content);
+
+                    return new XDRRemediationResponse
+                    {
+                        RequestId = request.RequestId,
+                        TenantId = request.TenantId,
+                        IncidentId = request.IncidentId,
+                        Success = true,
+                        Status = "Completed",
+                        Message = "Automated investigation initiated",
+                        Details = new Dictionary<string, object>
+                        {
+                            ["investigationId"] = investigation.GetProperty("id").GetString()!,
+                            ["machineId"] = machineId!,
+                            ["status"] = investigation.GetProperty("status").GetString()!
+                        },
+                        CompletedAt = DateTime.UtcNow,
+                        Duration = DateTime.UtcNow - startTime
+                    };
+                }
+
+                return new XDRRemediationResponse
+                {
+                    RequestId = request.RequestId,
+                    TenantId = request.TenantId,
+                    IncidentId = request.IncidentId,
+                    Success = false,
+                    Status = "Failed",
+                    Message = $"Failed to start investigation: {response.ReasonPhrase}",
+                    Errors = new List<string> { await response.Content.ReadAsStringAsync() },
+                    CompletedAt = DateTime.UtcNow,
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initiating automated investigation");
+                return new XDRRemediationResponse
+                {
+                    RequestId = request.RequestId,
+                    TenantId = request.TenantId,
+                    IncidentId = request.IncidentId,
+                    Success = false,
+                    Status = "Exception",
+                    Message = $"Exception occurred: {ex.Message}",
+                    Errors = new List<string> { ex.ToString() },
+                    CompletedAt = DateTime.UtcNow,
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
+        }
+
+        public async Task<XDRRemediationResponse> CancelMachineActionAsync(XDRRemediationRequest request)
+        {
+            var startTime = DateTime.UtcNow;
+            await SetAuthHeaderAsync(request.TenantId);
+
+            var actionId = request.Parameters["actionId"]?.ToString();
+            var comment = request.Parameters["comment"]?.ToString() ?? "Cancelling action via SentryXDR";
+
+            try
+            {
+                var actionBody = new { Comment = comment };
+                var response = await _httpClient.PostAsync(
+                    $"{_baseUrl}/api/machineactions/{actionId}/cancel",
+                    new StringContent(JsonSerializer.Serialize(actionBody), Encoding.UTF8, "application/json"));
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return new XDRRemediationResponse
+                    {
+                        RequestId = request.RequestId,
+                        TenantId = request.TenantId,
+                        IncidentId = request.IncidentId,
+                        Success = true,
+                        Status = "Completed",
+                        Message = "Machine action cancelled successfully",
+                        Details = new Dictionary<string, object>
+                        {
+                            ["actionId"] = actionId!,
+                            ["cancelledAt"] = DateTime.UtcNow
+                        },
+                        CompletedAt = DateTime.UtcNow,
+                        Duration = DateTime.UtcNow - startTime
+                    };
+                }
+
+                return new XDRRemediationResponse
+                {
+                    RequestId = request.RequestId,
+                    TenantId = request.TenantId,
+                    IncidentId = request.IncidentId,
+                    Success = false,
+                    Status = "Failed",
+                    Message = $"Failed to cancel action: {response.ReasonPhrase}",
+                    Errors = new List<string> { await response.Content.ReadAsStringAsync() },
+                    CompletedAt = DateTime.UtcNow,
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling machine action");
+                return new XDRRemediationResponse
+                {
+                    RequestId = request.RequestId,
+                    TenantId = request.TenantId,
+                    IncidentId = request.IncidentId,
+                    Success = false,
+                    Status = "Exception",
+                    Message = $"Exception occurred: {ex.Message}",
+                    Errors = new List<string> { ex.ToString() },
+                    CompletedAt = DateTime.UtcNow,
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
         }
     }
 }

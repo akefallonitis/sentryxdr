@@ -34,7 +34,15 @@ var host = new HostBuilder()
         services.AddHttpClient<IMCASApiService, MCASApiService>();
         services.AddHttpClient<IMDIApiService, MDIApiService>();
         
-        // ? Azure Worker (NEW)
+        // Advanced Hunting Service
+        services.AddHttpClient<IAdvancedHuntingService, AdvancedHuntingService>();
+        services.AddScoped<IAdvancedHuntingService, AdvancedHuntingService>();
+        
+        // Live Response Service
+        services.AddHttpClient<ILiveResponseService, LiveResponseService>();
+        services.AddScoped<ILiveResponseService, LiveResponseService>();
+        
+        // Azure Worker (NEW)
         services.AddHttpClient<IAzureWorkerService, AzureWorkerService>();
         services.AddScoped<IAzureWorkerService, AzureWorkerService>();
         

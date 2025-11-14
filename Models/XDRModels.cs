@@ -427,11 +427,24 @@ namespace SentryXDR.Models
         PutFileToDevice,                        // POST /machines/{id}/putfile
         GetFileFromDevice,                      // POST /machines/{id}/getfile
         
-        // ==================== Enhanced Incident Management (3 NEW) ?? ====================
+        // ==================== Enhanced Incident Management (3 NEW) ====================
         // Microsoft Graph Security API - Extended incident operations
         MergeAlertsIntoIncident,                // POST /security/incidents/{id}/alerts - Merge alerts into existing incident
         CreateIncidentFromAlert,                // POST /security/incidents - Create new incident from single alert
-        CreateIncidentFromAlerts                // POST /security/incidents - Create new incident from multiple correlated alerts (bulk)
+        CreateIncidentFromAlerts,               // POST /security/incidents - Create new incident from multiple correlated alerts (bulk)
+        
+        // ==================== File Detonation (4 NEW) ====================
+        // Microsoft Graph Security API - Threat Submission
+        SubmitFileForDetonation,                // POST /security/threatSubmission/fileContentThreats
+        GetDetonationReport,                    // GET /security/threatSubmission/fileContentThreats/{id}
+        SubmitURLForDetonation,                 // POST /security/threatSubmission/urlThreats
+        RemoveEmailFromQuarantine,              // POST /security/quarantine/messages/{id}/release
+        
+        // ==================== Enhanced MDE (3 NEW) ====================
+        // MDE Enhanced Actions
+        InitiateAutomatedInvestigation          // POST /machines/{id}/startInvestigation
+        // CollectInvestigationPackage is already defined above at line 76
+        // CancelMachineAction is already defined above at line 78
     }
 
     /// <summary>
