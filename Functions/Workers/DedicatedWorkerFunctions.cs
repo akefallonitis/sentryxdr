@@ -262,9 +262,27 @@ namespace SentryXDR.Functions.Workers
             {
                 return request.Action switch
                 {
+                    // VM Operations
                     XDRAction.StopVM => await _azureService.StopVMAsync(request),
+                    XDRAction.RestartVM => await _azureService.RestartVMAsync(request),
+                    XDRAction.DeleteVM => await _azureService.DeleteVMAsync(request),
+                    XDRAction.SnapshotVM => await _azureService.SnapshotVMAsync(request),
+                    
+                    // Network Isolation
                     XDRAction.IsolateVMNetwork => await _azureService.IsolateVMNetworkAsync(request),
-                    XDRAction.CreateNSGRule => await _azureService.CreateNSGRuleAsync(request),
+                    XDRAction.UpdateNSGRules => await _azureService.UpdateNSGRulesAsync(request),
+                    XDRAction.DisablePublicIP => await _azureService.DisablePublicIPAsync(request),
+                    
+                    // Security Operations
+                    XDRAction.DetachDisk => await _azureService.DetachDiskAsync(request),
+                    XDRAction.RevokeVMAccess => await _azureService.RevokeVMAccessAsync(request),
+                    XDRAction.BlockStorageAccount => await _azureService.BlockStorageAccountAsync(request),
+                    XDRAction.DisableServicePrincipal => await _azureService.DisableServicePrincipalAsync(request),
+                    XDRAction.RotateStorageKeys => await _azureService.RotateStorageKeysAsync(request),
+                    XDRAction.DeleteMaliciousResource => await _azureService.DeleteMaliciousResourceAsync(request),
+                    XDRAction.EnableDiagnosticLogs => await _azureService.EnableDiagnosticLogsAsync(request),
+                    XDRAction.TagResourceAsCompromised => await _azureService.TagResourceAsCompromisedAsync(request),
+                    
                     _ => CreateUnsupportedResponse(request)
                 };
             }

@@ -386,7 +386,46 @@ namespace SentryXDR.Models
         
         // Azure Defender (2)
         EnableAzureDefender,                    // PUT /subscriptions/{sub}/providers/Microsoft.Security/pricings/{tier}
-        DisableAzureDefender                    // DELETE /subscriptions/{sub}/providers/Microsoft.Security/pricings/{tier}
+        DisableAzureDefender,                   // DELETE /subscriptions/{sub}/providers/Microsoft.Security/pricings/{tier}
+        
+        // ==================== Incident Management (15 NEW) ====================
+        // Microsoft Graph Security API: /security/incidents
+        UpdateIncidentStatus,                   // PATCH /security/incidents/{id} (status: New, InProgress, Resolved, Closed)
+        UpdateIncidentSeverity,                 // PATCH /security/incidents/{id} (severity: Informational, Low, Medium, High, Critical)
+        UpdateIncidentClassification,           // PATCH /security/incidents/{id} (classification: TruePositive, FalsePositive, BenignPositive)
+        UpdateIncidentDetermination,            // PATCH /security/incidents/{id} (determination: Malware, Phishing, Suspicious, Clean, etc.)
+        AssignIncidentToUser,                   // PATCH /security/incidents/{id} (assignedTo)
+        AddIncidentComment,                     // POST /security/incidents/{id}/comments
+        AddIncidentTag,                         // PATCH /security/incidents/{id} (tags)
+        ResolveIncident,                        // PATCH /security/incidents/{id} (status: Resolved)
+        ReopenIncident,                         // PATCH /security/incidents/{id} (status: InProgress)
+        EscalateIncident,                       // PATCH /security/incidents/{id} (severity++)
+        LinkIncidentsToCase,                    // POST /security/cases/{id}/incidents
+        MergeIncidents,                         // POST /security/incidents/{id}/merge
+        TriggerAutomatedPlaybook,               // POST /security/incidents/{id}/runPlaybook
+        CreateCustomDetectionFromIncident,      // POST /security/customDetectionRules
+        ExportIncidentForReporting,             // POST /security/incidents/{id}/export
+        
+        // ==================== Azure Infrastructure - Additional (10 NEW) ====================
+        SnapshotVM,                             // POST /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/snapshots
+        DetachDisk,                             // POST /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/virtualMachines/{vm}/detach
+        RevokeVMAccess,                         // DELETE /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/virtualMachines/{vm}/extensions/VMAccessAgent
+        UpdateNSGRules,                         // PATCH /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/networkSecurityGroups/{nsg}
+        DisablePublicIP,                        // DELETE /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/publicIPAddresses/{ip}
+        BlockStorageAccount,                    // PATCH /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Storage/storageAccounts/{account}
+        DisableServicePrincipal,                // PATCH /servicePrincipals/{id} (accountEnabled: false)
+        RotateStorageKeys,                      // POST /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Storage/storageAccounts/{account}/regenerateKey
+        DeleteMaliciousResource,                // DELETE /subscriptions/{sub}/resourceGroups/{rg}/providers/{resourceType}/{resourceName}
+        EnableDiagnosticLogs,                   // PUT /subscriptions/{sub}/resourceGroups/{rg}/providers/{resourceType}/{resourceName}/providers/Microsoft.Insights/diagnosticSettings/{name}
+        TagResourceAsCompromised,               // PATCH /subscriptions/{sub}/resourceGroups/{rg}/providers/{resourceType}/{resourceName} (tags.Compromised: true)
+        
+        // ==================== Live Response Critical (5 NEW) ====================
+        // MDE Live Response API
+        RunLiveResponseScript,                  // POST /machines/{id}/runscript
+        UploadScriptToLibrary,                  // POST /libraryfiles
+        GetLiveResponseResults,                 // GET /machineactions/{id}/GetLiveResponseResultDownloadLink
+        PutFileToDevice,                        // POST /machines/{id}/putfile
+        GetFileFromDevice                       // POST /machines/{id}/getfile
     }
 
     /// <summary>
