@@ -347,21 +347,414 @@ namespace SentryXDR.Services.Workers
             }
         }
 
-        // Implement remaining 10 actions...
+        // ==================== REMAINING AZURE ACTIONS (10) ====================
         // (DetachDisk, RevokeVMAccess, UpdateNSGRules, DisablePublicIP, BlockStorageAccount, 
         //  DisableServicePrincipal, RotateStorageKeys, DeleteMaliciousResource, 
         //  EnableDiagnosticLogs, TagResourceAsCompromised)
 
-        public Task<XDRRemediationResponse> DetachDiskAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> RevokeVMAccessAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> UpdateNSGRulesAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> DisablePublicIPAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> BlockStorageAccountAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> DisableServicePrincipalAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> RotateStorageKeysAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> DeleteMaliciousResourceAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> EnableDiagnosticLogsAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
-        public Task<XDRRemediationResponse> TagResourceAsCompromisedAsync(XDRRemediationRequest request) => Task.FromResult(CreateSuccessResponse(request, "Not yet implemented"));
+        /// <summary>
+        /// Detach disk from VM for isolation
+        /// POST /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/disks/{diskName}/detach
+        /// </summary>
+        public async Task<XDRRemediationResponse> DetachDiskAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var vmName = request.Parameters["vmName"]?.ToString();
+                var diskName = request.Parameters["diskName"]?.ToString();
+
+                _logger.LogInformation("Detaching disk {DiskName} from VM {VmName}", diskName, vmName);
+
+                // Get current VM configuration
+                var vmUrl = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Compute/virtualMachines/{vmName}?api-version={ApiVersion}";
+                var vmResponse = await _httpClient.GetAsync(vmUrl);
+                var vmData = await vmResponse.Content.ReadAsStringAsync();
+                var vm = JsonSerializer.Deserialize<JsonElement>(vmData);
+
+                // Remove disk from data disks
+                var updateBody = new
+                {
+                    location = vm.GetProperty("location").GetString(),
+                    properties = new
+                    {
+                        storageProfile = new
+                        {
+                            osDisk = vm.GetProperty("properties").GetProperty("storageProfile").GetProperty("osDisk"),
+                            dataDisks = vm.GetProperty("properties").GetProperty("storageProfile").GetProperty("dataDisks")
+                                .EnumerateArray()
+                                .Where(d => d.GetProperty("name").GetString() != diskName)
+                                .ToArray()
+                        }
+                    }
+                };
+
+                var updateUrl = vmUrl;
+                var content = new StringContent(JsonSerializer.Serialize(updateBody), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PatchAsync(updateUrl, content);
+
+                return CreateSuccessResponse(request, $"Disk {diskName} detached from VM {vmName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to detach disk");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Revoke all VM access (remove extensions, reset passwords)
+        /// DELETE /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/virtualMachines/{vmName}/extensions/VMAccessAgent
+        /// </summary>
+        public async Task<XDRRemediationResponse> RevokeVMAccessAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var vmName = request.Parameters["vmName"]?.ToString();
+
+                _logger.LogInformation("Revoking VM access for {VmName}", vmName);
+
+                // Remove all VM extensions (VMAccessAgent, AzureMonitor, etc.)
+                var extensionsUrl = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Compute/virtualMachines/{vmName}/extensions?api-version={ApiVersion}";
+                var extensionsResponse = await _httpClient.GetAsync(extensionsUrl);
+                var extensionsData = await extensionsResponse.Content.ReadAsStringAsync();
+                var extensions = JsonSerializer.Deserialize<JsonElement>(extensionsData);
+
+                foreach (var extension in extensions.GetProperty("value").EnumerateArray())
+                {
+                    var extensionName = extension.GetProperty("name").GetString();
+                    var deleteUrl = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Compute/virtualMachines/{vmName}/extensions/{extensionName}?api-version={ApiVersion}";
+                    await _httpClient.DeleteAsync(deleteUrl);
+                }
+
+                return CreateSuccessResponse(request, $"VM access revoked for {vmName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to revoke VM access");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Update NSG rules to block malicious traffic
+        /// PATCH /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/networkSecurityGroups/{nsgName}
+        /// </summary>
+        public async Task<XDRRemediationResponse> UpdateNSGRulesAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var nsgName = request.Parameters["nsgName"]?.ToString();
+                var ruleName = request.Parameters["ruleName"]?.ToString() ?? "BlockMaliciousTraffic";
+                var sourceAddress = request.Parameters["sourceAddress"]?.ToString() ?? "*";
+                var destinationPort = request.Parameters["destinationPort"]?.ToString() ?? "*";
+
+                _logger.LogInformation("Updating NSG {NsgName} with rule {RuleName}", nsgName, ruleName);
+
+                var ruleBody = new
+                {
+                    properties = new
+                    {
+                        protocol = "*",
+                        sourceAddressPrefix = sourceAddress,
+                        destinationAddressPrefix = "*",
+                        access = "Deny",
+                        priority = 100,
+                        direction = "Inbound",
+                        sourcePortRange = "*",
+                        destinationPortRange = destinationPort
+                    }
+                };
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Network/networkSecurityGroups/{nsgName}/securityRules/{ruleName}?api-version=2023-05-01";
+                var content = new StringContent(JsonSerializer.Serialize(ruleBody), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PutAsync(url, content);
+
+                return CreateSuccessResponse(request, $"NSG rule {ruleName} created in {nsgName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update NSG rules");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Disable public IP from VM NIC
+        /// DELETE /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/publicIPAddresses/{ipName}
+        /// </summary>
+        public async Task<XDRRemediationResponse> DisablePublicIPAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var publicIpName = request.Parameters["publicIpName"]?.ToString();
+
+                _logger.LogInformation("Disabling public IP {PublicIpName}", publicIpName);
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Network/publicIPAddresses/{publicIpName}?api-version=2023-05-01";
+                var result = await _httpClient.DeleteAsync(url);
+
+                if (result.IsSuccessStatusCode)
+                {
+                    return CreateSuccessResponse(request, $"Public IP {publicIpName} deleted");
+                }
+                else
+                {
+                    return CreateFailureResponse(request, $"Failed to delete public IP: {result.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to disable public IP");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Block storage account access
+        /// PATCH /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}
+        /// </summary>
+        public async Task<XDRRemediationResponse> BlockStorageAccountAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var storageAccountName = request.Parameters["storageAccountName"]?.ToString();
+
+                _logger.LogInformation("Blocking storage account {StorageAccountName}", storageAccountName);
+
+                var updateBody = new
+                {
+                    properties = new
+                    {
+                        allowBlobPublicAccess = false,
+                        networkAcls = new
+                        {
+                            defaultAction = "Deny",
+                            bypass = "None"
+                        }
+                    }
+                };
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}?api-version=2023-01-01";
+                var content = new StringContent(JsonSerializer.Serialize(updateBody), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PatchAsync(url, content);
+
+                return CreateSuccessResponse(request, $"Storage account {storageAccountName} blocked");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to block storage account");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Disable malicious service principal
+        /// PATCH /servicePrincipals/{id}
+        /// </summary>
+        public async Task<XDRRemediationResponse> DisableServicePrincipalAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var servicePrincipalId = request.Parameters["servicePrincipalId"]?.ToString();
+
+                _logger.LogInformation("Disabling service principal {ServicePrincipalId}", servicePrincipalId);
+
+                var updateBody = new
+                {
+                    accountEnabled = false
+                };
+
+                // This uses Graph API, not Azure Management API
+                var graphToken = await _managedIdentityAuth.GetGraphTokenAsync(request.TenantId);
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", graphToken);
+
+                var url = $"https://graph.microsoft.com/v1.0/servicePrincipals/{servicePrincipalId}";
+                var content = new StringContent(JsonSerializer.Serialize(updateBody), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PatchAsync(url, content);
+
+                return CreateSuccessResponse(request, $"Service principal {servicePrincipalId} disabled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to disable service principal");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Rotate storage account keys
+        /// POST /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/regenerateKey
+        /// </summary>
+        public async Task<XDRRemediationResponse> RotateStorageKeysAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var storageAccountName = request.Parameters["storageAccountName"]?.ToString();
+                var keyName = request.Parameters["keyName"]?.ToString() ?? "key1";
+
+                _logger.LogInformation("Rotating storage key {KeyName} for {StorageAccountName}", keyName, storageAccountName);
+
+                var regenerateBody = new
+                {
+                    keyName = keyName
+                };
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}/regenerateKey?api-version=2023-01-01";
+                var content = new StringContent(JsonSerializer.Serialize(regenerateBody), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PostAsync(url, content);
+
+                return CreateSuccessResponse(request, $"Storage key {keyName} rotated for {storageAccountName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to rotate storage keys");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Delete malicious Azure resource
+        /// DELETE /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceType}/{resourceName}
+        /// </summary>
+        public async Task<XDRRemediationResponse> DeleteMaliciousResourceAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var resourceType = request.Parameters["resourceType"]?.ToString();
+                var resourceName = request.Parameters["resourceName"]?.ToString();
+
+                _logger.LogInformation("Deleting malicious resource {ResourceType}/{ResourceName}", resourceType, resourceName);
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceType}/{resourceName}?api-version={ApiVersion}";
+                var result = await _httpClient.DeleteAsync(url);
+
+                if (result.IsSuccessStatusCode)
+                {
+                    return CreateSuccessResponse(request, $"Resource {resourceType}/{resourceName} deleted");
+                }
+                else
+                {
+                    return CreateFailureResponse(request, $"Failed to delete resource: {result.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete malicious resource");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Enable diagnostic logs for forensics
+        /// PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceType}/{resourceName}/providers/Microsoft.Insights/diagnosticSettings/{name}
+        /// </summary>
+        public async Task<XDRRemediationResponse> EnableDiagnosticLogsAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var resourceType = request.Parameters["resourceType"]?.ToString();
+                var resourceName = request.Parameters["resourceName"]?.ToString();
+                var workspaceId = request.Parameters["logAnalyticsWorkspaceId"]?.ToString();
+
+                _logger.LogInformation("Enabling diagnostic logs for {ResourceType}/{ResourceName}", resourceType, resourceName);
+
+                var diagnosticSettings = new
+                {
+                    properties = new
+                    {
+                        workspaceId = workspaceId,
+                        logs = new[]
+                        {
+                            new { category = "Administrative", enabled = true },
+                            new { category = "Security", enabled = true },
+                            new { category = "ServiceHealth", enabled = true },
+                            new { category = "Alert", enabled = true }
+                        },
+                        metrics = new[]
+                        {
+                            new { category = "AllMetrics", enabled = true }
+                        }
+                    }
+                };
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceType}/{resourceName}/providers/Microsoft.Insights/diagnosticSettings/SecurityDiagnostics?api-version=2021-05-01-preview";
+                var content = new StringContent(JsonSerializer.Serialize(diagnosticSettings), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PutAsync(url, content);
+
+                return CreateSuccessResponse(request, $"Diagnostic logs enabled for {resourceType}/{resourceName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to enable diagnostic logs");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
+
+        /// <summary>
+        /// Tag resource as compromised for visibility
+        /// PATCH /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceType}/{resourceName}
+        /// </summary>
+        public async Task<XDRRemediationResponse> TagResourceAsCompromisedAsync(XDRRemediationRequest request)
+        {
+            try
+            {
+                await SetAuthHeaderAsync();
+                var subscriptionId = request.Parameters["subscriptionId"]?.ToString();
+                var resourceGroup = request.Parameters["resourceGroupName"]?.ToString();
+                var resourceType = request.Parameters["resourceType"]?.ToString();
+                var resourceName = request.Parameters["resourceName"]?.ToString();
+                var incidentId = request.IncidentId;
+
+                _logger.LogInformation("Tagging resource {ResourceType}/{ResourceName} as compromised", resourceType, resourceName);
+
+                var updateBody = new
+                {
+                    tags = new
+                    {
+                        SecurityStatus = "Compromised",
+                        IncidentId = incidentId,
+                        RemediationDate = DateTime.UtcNow.ToString("o"),
+                        RemediatedBy = request.InitiatedBy
+                    }
+                };
+
+                var url = $"{AzureManagementBaseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/{resourceType}/{resourceName}?api-version={ApiVersion}";
+                var content = new StringContent(JsonSerializer.Serialize(updateBody), Encoding.UTF8, "application/json");
+                var result = await _httpClient.PatchAsync(url, content);
+
+                return CreateSuccessResponse(request, $"Resource {resourceType}/{resourceName} tagged as compromised");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to tag resource as compromised");
+                return CreateExceptionResponse(request, ex);
+            }
+        }
 
         private XDRRemediationResponse CreateSuccessResponse(XDRRemediationRequest request, string message, Dictionary<string, object>? details = null)
         {

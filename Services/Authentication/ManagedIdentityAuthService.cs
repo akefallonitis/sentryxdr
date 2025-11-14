@@ -15,6 +15,7 @@ namespace SentryXDR.Services.Authentication
         Task<string> GetAzureManagementTokenAsync();
         Task<string> GetAzureTokenAsync(string resource);
         Task<string> GetAzureTokenWithScopeAsync(string[] scopes);
+        Task<string> GetGraphTokenAsync(string tenantId);
         Task<bool> ValidateRBACPermissionsAsync(string subscriptionId, string[] requiredRoles);
         Task<string> GetManagedIdentityObjectIdAsync();
         Task<string> GetManagedIdentityClientIdAsync();
@@ -148,7 +149,48 @@ namespace SentryXDR.Services.Authentication
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to acquire token for scopes: {Scopes}", string.Join(", ", scopes));
+                _logger.LogError(ex, "Failed to acquire token with scopes");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Get Microsoft Graph API token for tenant operations
+        /// </summary>
+        public async Task<string> GetGraphTokenAsync(string tenantId)
+        {
+            try
+            {
+                // Microsoft Graph API resource
+                var graphResource = "https://graph.microsoft.com";
+                var scope = $"{graphResource}/.default";
+                var tokenRequestContext = new TokenRequestContext(new[] { scope });
+
+                AccessToken token;
+
+                // Try Managed Identity first
+                if (_managedIdentityCredential != null)
+                {
+                    try
+                    {
+                        token = await _managedIdentityCredential.GetTokenAsync(tokenRequestContext);
+                        _logger.LogDebug("Acquired Graph token using Managed Identity for tenant: {TenantId}", tenantId);
+                        return token.Token;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Managed Identity failed for Graph token, falling back");
+                    }
+                }
+
+                // Fall back to default credential
+                token = await _defaultCredential.GetTokenAsync(tokenRequestContext);
+                _logger.LogDebug("Acquired Graph token for tenant: {TenantId}", tenantId);
+                return token.Token;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to acquire Graph token for tenant: {TenantId}", tenantId);
                 throw;
             }
         }
