@@ -1,4 +1,3 @@
-# Azure DevOps Pipeline for SentryXDR
 # Automated Build, Test, and Deploy
 
 trigger:
@@ -11,6 +10,7 @@ trigger:
       - 'Services/**'
       - 'Functions/**'
       - 'Models/**'
+      - 'Deployment/**'
       - '*.csproj'
 
 pr:
@@ -22,9 +22,10 @@ pr:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.x'
-  azureSubscription: 'SentryXDR-ServiceConnection'  # Update with your service connection name
+  azureSubscription: 'SentryXDR-ServiceConnection'
   functionAppName: 'sentryxdr-func-$(Environment.Name)'
   resourceGroupName: 'sentryxdr-$(Environment.Name)-rg'
+  location: 'eastus'
 
 stages:
 - stage: Build
@@ -77,16 +78,64 @@ stages:
         arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/functions'
         zipAfterPublish: true
     
+    - task: CopyFiles@2
+      displayName: 'Copy ARM Templates'
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)/Deployment'
+        Contents: |
+          azuredeploy.json
+          scripts/**
+        TargetFolder: '$(Build.ArtifactStagingDirectory)/arm'
+    
     - task: PublishBuildArtifacts@1
       displayName: 'Publish Artifacts'
       inputs:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
         ArtifactName: 'drop'
 
-- stage: DeployDev
-  displayName: 'Deploy to Development'
+- stage: DeployInfrastructureDev
+  displayName: 'Deploy Infrastructure (Dev)'
   dependsOn: Build
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  variables:
+    Environment.Name: 'dev'
+  
+  jobs:
+  - deployment: DeployARMTemplate
+    displayName: 'Deploy ARM Template'
+    environment: 'SentryXDR-Dev-Infra'
+    pool:
+      vmImage: 'windows-latest'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureResourceManagerTemplateDeployment@3
+            displayName: 'Deploy Azure Resources'
+            inputs:
+              deploymentScope: 'Resource Group'
+              azureResourceManagerConnection: '$(azureSubscription)'
+              subscriptionId: '$(subscriptionId)'
+              action: 'Create Or Update Resource Group'
+              resourceGroupName: '$(resourceGroupName)'
+              location: '$(location)'
+              templateLocation: 'Linked artifact'
+              csmFile: '$(Pipeline.Workspace)/drop/arm/azuredeploy.json'
+              overrideParameters: |
+                -projectName sentryxdr
+                -location $(location)
+                -environment dev
+                -multiTenantAppId $(MultiTenantAppId)
+                -multiTenantAppSecret $(MultiTenantAppSecret)
+                -deployHybridWorker false
+                -functionAppSku EP1
+              deploymentMode: 'Incremental'
+
+- stage: DeployFunctionDev
+  displayName: 'Deploy Function App (Dev)'
+  dependsOn: DeployInfrastructureDev
+  condition: succeeded()
   variables:
     Environment.Name: 'dev'
   
@@ -102,25 +151,126 @@ stages:
         deploy:
           steps:
           - task: AzureFunctionApp@1
-            displayName: 'Deploy Azure Function App'
+            displayName: 'Deploy Function App'
             inputs:
               azureSubscription: '$(azureSubscription)'
               appType: 'functionApp'
               appName: '$(functionAppName)'
-              package: '$(Pipeline.Workspace)/drop/functions/*.zip'
-              deploymentMethod: 'zipDeploy'
+              package: '$(Pipeline.Workspace)/drop/functions/**/*.zip'
+              deploymentMethod: 'auto'
+          
+          - task: PowerShell@2
+            displayName: 'Wait for Function App Startup'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Waiting 60 seconds for Function App to initialize..."
+                Start-Sleep -Seconds 60
+          
+          - task: PowerShell@2
+            displayName: 'Health Check'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $healthUrl = "https://$(functionAppName).azurewebsites.net/api/xdr/health"
+                Write-Host "Testing health endpoint: $healthUrl"
+                
+                $maxRetries = 5
+                $retryCount = 0
+                $success = $false
+                
+                while ($retryCount -lt $maxRetries -and -not $success) {
+                  try {
+                    $response = Invoke-RestMethod -Uri $healthUrl -Method Get -ErrorAction Stop
+                    if ($response.status -eq "Healthy") {
+                      Write-Host "? Health check passed!"
+                      Write-Host "Response: $($response | ConvertTo-Json)"
+                      $success = $true
+                    } else {
+                      Write-Warning "Health check returned unexpected status: $($response.status)"
+                      $retryCount++
+                      Start-Sleep -Seconds 10
+                    }
+                  } catch {
+                    Write-Warning "Health check failed (attempt $($retryCount + 1)/$maxRetries): $_"
+                    $retryCount++
+                    if ($retryCount -lt $maxRetries) {
+                      Start-Sleep -Seconds 10
+                    }
+                  }
+                }
+                
+                if (-not $success) {
+                  Write-Error "Health check failed after $maxRetries attempts"
+                  exit 1
+                }
+          
+          - task: PowerShell@2
+            displayName: 'Verify Swagger UI'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $swaggerUrl = "https://$(functionAppName).azurewebsites.net/api/swagger.json"
+                Write-Host "Testing Swagger endpoint: $swaggerUrl"
+                
+                try {
+                  $response = Invoke-RestMethod -Uri $swaggerUrl -Method Get
+                  Write-Host "? Swagger UI is accessible!"
+                  Write-Host "Swagger UI URL: https://$(functionAppName).azurewebsites.net/api/swagger/ui"
+                } catch {
+                  Write-Warning "Swagger UI verification failed: $_"
+                }
 
-- stage: DeployProd
-  displayName: 'Deploy to Production'
+- stage: DeployInfrastructureStaging
+  displayName: 'Deploy Infrastructure (Staging)'
   dependsOn: Build
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   variables:
-    Environment.Name: 'prod'
+    Environment.Name: 'staging'
+  
+  jobs:
+  - deployment: DeployARMTemplate
+    displayName: 'Deploy ARM Template'
+    environment: 'SentryXDR-Staging-Infra'
+    pool:
+      vmImage: 'windows-latest'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureResourceManagerTemplateDeployment@3
+            displayName: 'Deploy Azure Resources'
+            inputs:
+              deploymentScope: 'Resource Group'
+              azureResourceManagerConnection: '$(azureSubscription)'
+              subscriptionId: '$(subscriptionId)'
+              action: 'Create Or Update Resource Group'
+              resourceGroupName: '$(resourceGroupName)'
+              location: '$(location)'
+              templateLocation: 'Linked artifact'
+              csmFile: '$(Pipeline.Workspace)/drop/arm/azuredeploy.json'
+              overrideParameters: |
+                -projectName sentryxdr
+                -location $(location)
+                -environment staging
+                -multiTenantAppId $(MultiTenantAppId)
+                -multiTenantAppSecret $(MultiTenantAppSecret)
+                -deployHybridWorker false
+                -functionAppSku EP1
+              deploymentMode: 'Incremental'
+
+- stage: DeployFunctionStaging
+  displayName: 'Deploy Function App (Staging)'
+  dependsOn: DeployInfrastructureStaging
+  condition: succeeded()
+  variables:
+    Environment.Name: 'staging'
   
   jobs:
   - deployment: DeployFunction
     displayName: 'Deploy Function App'
-    environment: 'SentryXDR-Prod'
+    environment: 'SentryXDR-Staging'
     pool:
       vmImage: 'windows-latest'
     
@@ -129,25 +279,72 @@ stages:
         deploy:
           steps:
           - task: AzureFunctionApp@1
-            displayName: 'Deploy Azure Function App'
+            displayName: 'Deploy Function App'
             inputs:
               azureSubscription: '$(azureSubscription)'
               appType: 'functionApp'
               appName: '$(functionAppName)'
-              package: '$(Pipeline.Workspace)/drop/functions/*.zip'
-              deploymentMethod: 'zipDeploy'
+              package: '$(Pipeline.Workspace)/drop/functions/**/*.zip'
+              deploymentMethod: 'auto'
           
-          - task: AzurePowerShell@5
-            displayName: 'Run Health Check'
+          - task: PowerShell@2
+            displayName: 'Wait for Function App Startup'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Waiting 60 seconds for Function App to initialize..."
+                Start-Sleep -Seconds 60
+          
+          - task: PowerShell@2
+            displayName: 'Health Check'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $healthUrl = "https://$(functionAppName).azurewebsites.net/api/xdr/health"
+                $response = Invoke-RestMethod -Uri $healthUrl -Method Get
+                if ($response.status -ne "Healthy") {
+                  Write-Error "Health check failed"
+                  exit 1
+                }
+                Write-Host "? Health check passed!"
+
+- stage: DeployProduction
+  displayName: 'Deploy to Production'
+  dependsOn: DeployFunctionStaging
+  condition: succeeded()
+  variables:
+    Environment.Name: 'prod'
+  
+  jobs:
+  - deployment: DeployFunction
+    displayName: 'Deploy Function App'
+    environment: 'SentryXDR-Production'
+    pool:
+      vmImage: 'windows-latest'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy Function App'
             inputs:
               azureSubscription: '$(azureSubscription)'
-              ScriptType: 'InlineScript'
-              Inline: |
-                $functionUrl = "https://$(functionAppName).azurewebsites.net/api/xdr/health"
-                $response = Invoke-RestMethod -Uri $functionUrl -Method Get
-                if ($response.status -eq "healthy") {
-                  Write-Host "Health check passed!"
-                } else {
-                  Write-Error "Health check failed!"
+              appType: 'functionApp'
+              appName: '$(functionAppName)'
+              package: '$(Pipeline.Workspace)/drop/functions/**/*.zip'
+              deploymentMethod: 'auto'
+          
+          - task: PowerShell@2
+            displayName: 'Production Health Check'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $healthUrl = "https://$(functionAppName).azurewebsites.net/api/xdr/health"
+                $response = Invoke-RestMethod -Uri $healthUrl -Method Get
+                if ($response.status -ne "Healthy") {
+                  Write-Error "Production health check failed!"
+                  exit 1
                 }
-              azurePowerShellVersion: 'LatestVersion'
+                Write-Host "? Production deployment successful!"
+                Write-Host "Swagger UI: https://$(functionAppName).azurewebsites.net/api/swagger/ui"
