@@ -2,7 +2,7 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
-    "description": "SentryXDR - Complete One-Click Deployment - NO Key Vault (uses environment variables)"
+    "description": "SentryXDR - Multi-Tenant XDR Orchestration Platform - Complete Deployment"
   },
   "parameters": {
     "projectName": {
@@ -11,28 +11,34 @@
       "minLength": 3,
       "maxLength": 11,
       "metadata": {
-        "description": "Project name (3-11 characters, lowercase)"
+        "description": "Project name (3-11 characters, lowercase, alphanumeric)"
       }
     },
     "location": {
       "type": "string",
-      "defaultValue": "[resourceGroup().location]"
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
     },
     "environment": {
       "type": "string",
       "defaultValue": "prod",
-      "allowedValues": ["dev", "test", "staging", "prod"]
+      "allowedValues": ["dev", "test", "staging", "prod"],
+      "metadata": {
+        "description": "Environment name"
+      }
     },
     "multiTenantAppId": {
       "type": "string",
       "metadata": {
-        "description": "Multi-tenant App Registration Client ID"
+        "description": "Multi-tenant App Registration Client ID (required)"
       }
     },
     "multiTenantAppSecret": {
       "type": "securestring",
       "metadata": {
-        "description": "App Registration Client Secret (stored in env variable)"
+        "description": "App Registration Client Secret (required)"
       }
     },
     "deployHybridWorker": {
@@ -45,18 +51,64 @@
     "functionAppSku": {
       "type": "string",
       "defaultValue": "EP1",
-      "allowedValues": ["EP1", "EP2", "EP3"]
+      "allowedValues": ["EP1", "EP2", "EP3"],
+      "metadata": {
+        "description": "Function App Premium SKU"
+      }
+    },
+    "repoUrl": {
+      "type": "string",
+      "defaultValue": "https://github.com/akefallonitis/sentryxdr",
+      "metadata": {
+        "description": "GitHub repository URL for deployment package"
+      }
+    },
+    "repoBranch": {
+      "type": "string",
+      "defaultValue": "main",
+      "metadata": {
+        "description": "GitHub repository branch"
+      }
+    },
+    "projectTag": {
+      "type": "string",
+      "defaultValue": "SentryXDR",
+      "metadata": {
+        "description": "Project tag for all resources"
+      }
+    },
+    "createdByTag": {
+      "type": "string",
+      "defaultValue": "[concat('User:', parameters('multiTenantAppId'))]",
+      "metadata": {
+        "description": "Created by tag"
+      }
+    },
+    "enableSourceControl": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable GitHub source control integration"
+      }
     }
   },
   "variables": {
     "suffix": "[uniqueString(resourceGroup().id)]",
     "functionAppName": "[concat(parameters('projectName'), '-func-', variables('suffix'))]",
     "planName": "[concat(parameters('projectName'), '-plan-', variables('suffix'))]",
-    "storageName": "[concat(replace(parameters('projectName'), '-', ''), variables('suffix'))]",
+    "storageName": "[concat(replace(parameters('projectName'), '-', ''), take(variables('suffix'), 8))]",
     "forensicsStorageName": "[concat(replace(parameters('projectName'), '-', ''), 'forensics', take(variables('suffix'), 6))]",
     "appInsightsName": "[concat(parameters('projectName'), '-ai-', variables('suffix'))]",
     "automationName": "[concat(parameters('projectName'), '-auto-', variables('suffix'))]",
-    "logWorkspaceName": "[concat(parameters('projectName'), '-logs-', variables('suffix'))]"
+    "logWorkspaceName": "[concat(parameters('projectName'), '-logs-', variables('suffix'))]",
+    "packageUri": "[concat(parameters('repoUrl'), '/releases/download/v1.0.0/sentryxdr-package.zip')]",
+    "commonTags": {
+      "Project": "[parameters('projectTag')]",
+      "Environment": "[parameters('environment')]",
+      "CreatedBy": "[parameters('createdByTag')]",
+      "ManagedBy": "ARM Template",
+      "Version": "1.0.0"
+    }
   },
   "resources": [
     {
@@ -65,13 +117,15 @@
       "name": "[variables('logWorkspaceName')]",
       "location": "[parameters('location')]",
       "properties": {
-        "sku": {"name": "PerGB2018"},
-        "retentionInDays": 90
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 90,
+        "features": {
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
       },
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]"
-      }
+      "tags": "[variables('commonTags')]"
     },
     {
       "type": "Microsoft.Insights/components",
@@ -84,47 +138,44 @@
       ],
       "properties": {
         "Application_Type": "web",
-        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logWorkspaceName'))]"
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logWorkspaceName'))]",
+        "RetentionInDays": 90
       },
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]"
-      }
+      "tags": "[union(variables('commonTags'), createObject('DisplayName', 'Application Insights'))]"
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
       "apiVersion": "2021-09-01",
       "name": "[variables('storageName')]",
       "location": "[parameters('location')]",
-      "sku": {"name": "Standard_LRS"},
+      "sku": {
+        "name": "Standard_LRS"
+      },
       "kind": "StorageV2",
       "properties": {
         "supportsHttpsTrafficOnly": true,
-        "minimumTlsVersion": "TLS1_2"
+        "minimumTlsVersion": "TLS1_2",
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false
       },
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]",
-        "Purpose": "Function App Storage"
-      }
+      "tags": "[union(variables('commonTags'), createObject('Purpose', 'Function App Storage'))]"
     },
     {
       "type": "Microsoft.Storage/storageAccounts",
       "apiVersion": "2021-09-01",
       "name": "[variables('forensicsStorageName')]",
       "location": "[parameters('location')]",
-      "sku": {"name": "Standard_GRS"},
+      "sku": {
+        "name": "Standard_GRS"
+      },
       "kind": "StorageV2",
       "properties": {
         "accessTier": "Cool",
         "supportsHttpsTrafficOnly": true,
-        "minimumTlsVersion": "TLS1_2"
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false
       },
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]",
-        "Purpose": "Forensics Evidence Storage"
-      }
+      "tags": "[union(variables('commonTags'), createObject('Purpose', 'Forensics Evidence Storage'))]"
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices",
@@ -137,6 +188,10 @@
         "deleteRetentionPolicy": {
           "enabled": true,
           "days": 90
+        },
+        "containerDeleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7
         }
       }
     },
@@ -146,7 +201,10 @@
       "name": "[concat(variables('forensicsStorageName'), '/default/forensics-investigation-packages')]",
       "dependsOn": [
         "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('forensicsStorageName'), 'default')]"
-      ]
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
@@ -154,7 +212,10 @@
       "name": "[concat(variables('forensicsStorageName'), '/default/forensics-live-response')]",
       "dependsOn": [
         "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('forensicsStorageName'), 'default')]"
-      ]
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
@@ -162,7 +223,10 @@
       "name": "[concat(variables('forensicsStorageName'), '/default/forensics-detonation-results')]",
       "dependsOn": [
         "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('forensicsStorageName'), 'default')]"
-      ]
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
     },
     {
       "type": "Microsoft.Web/serverfarms",
@@ -171,13 +235,24 @@
       "location": "[parameters('location')]",
       "sku": {
         "name": "[parameters('functionAppSku')]",
-        "tier": "ElasticPremium"
+        "tier": "ElasticPremium",
+        "size": "[parameters('functionAppSku')]",
+        "family": "EP"
       },
       "kind": "elastic",
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]"
-      }
+      "properties": {
+        "perSiteScaling": false,
+        "elasticScaleEnabled": true,
+        "maximumElasticWorkerCount": 20,
+        "isSpot": false,
+        "reserved": false,
+        "isXenon": false,
+        "hyperV": false,
+        "targetWorkerCount": 0,
+        "targetWorkerSizeId": 0,
+        "zoneRedundant": false
+      },
+      "tags": "[variables('commonTags')]"
     },
     {
       "type": "Microsoft.Web/sites",
@@ -185,7 +260,9 @@
       "name": "[variables('functionAppName')]",
       "location": "[parameters('location')]",
       "kind": "functionapp",
-      "identity": {"type": "SystemAssigned"},
+      "identity": {
+        "type": "SystemAssigned"
+      },
       "dependsOn": [
         "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
         "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]",
@@ -195,30 +272,102 @@
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
         "httpsOnly": true,
+        "clientAffinityEnabled": false,
         "siteConfig": {
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "netFrameworkVersion": "v8.0",
+          "use32BitWorkerProcess": false,
+          "cors": {
+            "allowedOrigins": ["*"]
+          },
           "appSettings": [
-            {"name": "AzureWebJobsStorage", "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2021-09-01').keys[0].value)]"},
-            {"name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2021-09-01').keys[0].value)]"},
-            {"name": "WEBSITE_CONTENTSHARE", "value": "[toLower(variables('functionAppName'))]"},
-            {"name": "FUNCTIONS_EXTENSION_VERSION", "value": "~4"},
-            {"name": "FUNCTIONS_WORKER_RUNTIME", "value": "dotnet-isolated"},
-            {"name": "APPINSIGHTS_INSTRUMENTATIONKEY", "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName'))).InstrumentationKey]"},
-            {"name": "APPLICATIONINSIGHTS_CONNECTION_STRING", "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName'))).ConnectionString]"},
-            {"name": "ForensicsStorageConnection", "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('forensicsStorageName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('forensicsStorageName')), '2021-09-01').keys[0].value)]"},
-            {"name": "MultiTenant__ClientId", "value": "[parameters('multiTenantAppId')]"},
-            {"name": "MultiTenant__ClientSecret", "value": "[parameters('multiTenantAppSecret')]"},
-            {"name": "Azure__SubscriptionId", "value": "[subscription().subscriptionId]"},
-            {"name": "Azure__ResourceGroupName", "value": "[resourceGroup().name]"},
-            {"name": "Azure__AutomationAccountName", "value": "[if(parameters('deployHybridWorker'), variables('automationName'), '')]"},
-            {"name": "ProjectName", "value": "[parameters('projectName')]"},
-            {"name": "Environment", "value": "[parameters('environment')]"}
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2021-09-01').keys[0].value, ';EndpointSuffix=core.windows.net')]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageName')), '2021-09-01').keys[0].value, ';EndpointSuffix=core.windows.net')]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[toLower(variables('functionAppName'))]"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "dotnet-isolated"
+            },
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').InstrumentationKey]"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            {
+              "name": "ForensicsStorageConnection",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('forensicsStorageName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('forensicsStorageName')), '2021-09-01').keys[0].value, ';EndpointSuffix=core.windows.net')]"
+            },
+            {
+              "name": "MultiTenant__ClientId",
+              "value": "[parameters('multiTenantAppId')]"
+            },
+            {
+              "name": "MultiTenant__ClientSecret",
+              "value": "[parameters('multiTenantAppSecret')]"
+            },
+            {
+              "name": "Azure__SubscriptionId",
+              "value": "[subscription().subscriptionId]"
+            },
+            {
+              "name": "Azure__ResourceGroupName",
+              "value": "[resourceGroup().name]"
+            },
+            {
+              "name": "Azure__AutomationAccountName",
+              "value": "[if(parameters('deployHybridWorker'), variables('automationName'), '')]"
+            },
+            {
+              "name": "ProjectName",
+              "value": "[parameters('projectName')]"
+            },
+            {
+              "name": "Environment",
+              "value": "[parameters('environment')]"
+            },
+            {
+              "name": "WEBSITE_RUN_FROM_PACKAGE",
+              "value": "[variables('packageUri')]"
+            }
           ]
         }
       },
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]"
-      }
+      "tags": "[union(variables('commonTags'), createObject('DisplayName', 'SentryXDR Function App'))]",
+      "resources": [
+        {
+          "condition": "[parameters('enableSourceControl')]",
+          "type": "sourcecontrols",
+          "apiVersion": "2021-03-01",
+          "name": "web",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+          ],
+          "properties": {
+            "repoUrl": "[parameters('repoUrl')]",
+            "branch": "[parameters('repoBranch')]",
+            "isManualIntegration": true,
+            "deploymentRollbackEnabled": false,
+            "isMercurial": false
+          }
+        }
+      ]
     },
     {
       "condition": "[parameters('deployHybridWorker')]",
@@ -226,14 +375,46 @@
       "apiVersion": "2021-06-22",
       "name": "[variables('automationName')]",
       "location": "[parameters('location')]",
-      "identity": {"type": "SystemAssigned"},
-      "properties": {
-        "sku": {"name": "Basic"}
+      "identity": {
+        "type": "SystemAssigned"
       },
-      "tags": {
-        "Project": "SentryXDR",
-        "Environment": "[parameters('environment')]",
-        "Purpose": "On-Premise AD Integration"
+      "properties": {
+        "sku": {
+          "name": "Basic"
+        },
+        "encryption": {
+          "keySource": "Microsoft.Automation"
+        }
+      },
+      "tags": "[union(variables('commonTags'), createObject('Purpose', 'On-Premise AD Integration', 'DisplayName', 'Hybrid Worker Automation'))]"
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2020-04-01-preview",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('functionAppName')), 'StorageBlobDataContributor')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('forensicsStorageName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2021-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "scope": "[resourceId('Microsoft.Storage/storageAccounts', variables('forensicsStorageName'))]"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2020-04-01-preview",
+      "name": "[guid(resourceId('Microsoft.Web/sites', variables('functionAppName')), 'Contributor')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2021-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal",
+        "scope": "[resourceGroup().id]"
       }
     }
   ],
@@ -244,7 +425,11 @@
     },
     "functionAppUrl": {
       "type": "string",
-      "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', variables('functionAppName'))).defaultHostName)]"
+      "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2021-03-01').defaultHostName)]"
+    },
+    "swaggerUrl": {
+      "type": "string",
+      "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2021-03-01').defaultHostName, '/api/swagger/ui')]"
     },
     "functionAppPrincipalId": {
       "type": "string",
@@ -260,11 +445,15 @@
     },
     "automationAccountName": {
       "type": "string",
-      "value": "[if(parameters('deployHybridWorker'), variables('automationName'), '')]"
+      "value": "[if(parameters('deployHybridWorker'), variables('automationName'), 'Not Deployed')]"
     },
     "applicationInsightsName": {
       "type": "string",
       "value": "[variables('appInsightsName')]"
+    },
+    "logWorkspaceName": {
+      "type": "string",
+      "value": "[variables('logWorkspaceName')]"
     }
   }
 }
