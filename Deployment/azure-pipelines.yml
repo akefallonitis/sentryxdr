@@ -1,0 +1,153 @@
+# Azure DevOps Pipeline for SentryXDR
+# Automated Build, Test, and Deploy
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - 'Services/**'
+      - 'Functions/**'
+      - 'Models/**'
+      - '*.csproj'
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '8.x'
+  azureSubscription: 'SentryXDR-ServiceConnection'  # Update with your service connection name
+  functionAppName: 'sentryxdr-func-$(Environment.Name)'
+  resourceGroupName: 'sentryxdr-$(Environment.Name)-rg'
+
+stages:
+- stage: Build
+  displayName: 'Build and Test'
+  jobs:
+  - job: Build
+    displayName: 'Build SentryXDR'
+    pool:
+      vmImage: 'windows-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        version: $(dotnetVersion)
+        packageType: 'sdk'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet Packages'
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Build Solution'
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Run Unit Tests'
+      inputs:
+        command: 'test'
+        projects: '**/*Tests.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage"'
+    
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish Code Coverage'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(Agent.TempDirectory)/**/coverage.cobertura.xml'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish Function App'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/functions'
+        zipAfterPublish: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifacts'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+
+- stage: DeployDev
+  displayName: 'Deploy to Development'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  variables:
+    Environment.Name: 'dev'
+  
+  jobs:
+  - deployment: DeployFunction
+    displayName: 'Deploy Function App'
+    environment: 'SentryXDR-Dev'
+    pool:
+      vmImage: 'windows-latest'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy Azure Function App'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'functionApp'
+              appName: '$(functionAppName)'
+              package: '$(Pipeline.Workspace)/drop/functions/*.zip'
+              deploymentMethod: 'zipDeploy'
+
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+    Environment.Name: 'prod'
+  
+  jobs:
+  - deployment: DeployFunction
+    displayName: 'Deploy Function App'
+    environment: 'SentryXDR-Prod'
+    pool:
+      vmImage: 'windows-latest'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy Azure Function App'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'functionApp'
+              appName: '$(functionAppName)'
+              package: '$(Pipeline.Workspace)/drop/functions/*.zip'
+              deploymentMethod: 'zipDeploy'
+          
+          - task: AzurePowerShell@5
+            displayName: 'Run Health Check'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              ScriptType: 'InlineScript'
+              Inline: |
+                $functionUrl = "https://$(functionAppName).azurewebsites.net/api/xdr/health"
+                $response = Invoke-RestMethod -Uri $functionUrl -Method Get
+                if ($response.status -eq "healthy") {
+                  Write-Host "Health check passed!"
+                } else {
+                  Write-Error "Health check failed!"
+                }
+              azurePowerShellVersion: 'LatestVersion'

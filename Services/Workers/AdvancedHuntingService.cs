@@ -37,7 +37,7 @@ namespace SentryXDR.Services.Workers
 
         private async Task SetAuthHeaderAsync(string tenantId)
         {
-            var token = await _authService.GetMdeTokenAsync(tenantId);
+            var token = await _authService.GetMDETokenAsync(tenantId);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 

@@ -12,6 +12,8 @@ namespace SentryXDR.Services.Authentication
         Task<string> GetGraphBetaTokenAsync(string tenantId);
         Task<string> GetMDETokenAsync(string tenantId);
         Task<string> GetAzureManagementTokenAsync(string tenantId);
+        Task<string> GetMCASTokenAsync(string tenantId);
+        Task<string> GetMDITokenAsync(string tenantId);
     }
 
     public class MultiTenantAuthService : IMultiTenantAuthService
@@ -85,6 +87,19 @@ namespace SentryXDR.Services.Authentication
         public async Task<string> GetAzureManagementTokenAsync(string tenantId)
         {
             return await GetAccessTokenAsync(tenantId, "https://management.azure.com");
+        }
+
+        public async Task<string> GetMCASTokenAsync(string tenantId)
+        {
+            // MCAS uses a custom API token - need to retrieve from configuration or Key Vault
+            // For multi-tenant scenarios, use the portal API with Graph token
+            return await GetAccessTokenAsync(tenantId, "https://graph.microsoft.com");
+        }
+
+        public async Task<string> GetMDITokenAsync(string tenantId)
+        {
+            // MDI uses Microsoft Graph Security API
+            return await GetAccessTokenAsync(tenantId, "https://graph.microsoft.com");
         }
 
         private IConfidentialClientApplication GetOrCreateClientApp(string tenantId)

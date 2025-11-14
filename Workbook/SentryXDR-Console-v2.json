@@ -1,0 +1,500 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "tenant-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "SelectedTenant",
+            "label": "?? Tenant",
+            "type": 2,
+            "description": "Select target tenant (Lighthouse support)",
+            "isRequired": true,
+            "query": "// Custom endpoint: GET /api/v1/workbook/tenants\r\n// Returns: [{\"id\": \"tenant-guid\", \"name\": \"Contoso\", \"isDefault\": true}]\r\ndatatable(TenantId:string, TenantName:string, IsDefault:bool)\r\n[\r\n  \"00000000-0000-0000-0000-000000000000\", \"Primary Tenant\", true,\r\n  \"11111111-1111-1111-1111-111111111111\", \"Managed Tenant 1\", false,\r\n  \"22222222-2222-2222-2222-222222222222\", \"Managed Tenant 2\", false\r\n]\r\n| project value = TenantId, label = strcat(TenantName, iff(IsDefault, \" (Default)\", \"\"))",
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "timeContext": {
+              "durationMs": 86400000
+            },
+            "defaultValue": "value::1",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          },
+          {
+            "id": "incident-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "SelectedIncident",
+            "label": "?? Incident",
+            "type": 2,
+            "description": "Select incident to investigate",
+            "isRequired": false,
+            "query": "// Custom endpoint: GET /api/v1/workbook/incidents?tenantId={SelectedTenant}\r\n// Returns: [{\"id\": \"incident-id\", \"title\": \"Phishing Attack\", \"severity\": \"High\"}]\r\ndatatable(IncidentId:string, Title:string, Severity:string, Status:string)\r\n[\r\n  \"INC-12345\", \"Ransomware Detection - High Severity\", \"High\", \"Active\",\r\n  \"INC-12346\", \"Phishing Campaign Detected\", \"Medium\", \"Active\",\r\n  \"INC-12347\", \"Suspicious PowerShell Execution\", \"Low\", \"Investigating\"\r\n]\r\n| project value = IncidentId, label = strcat(IncidentId, \" - \", Title, \" [\", Severity, \"]\"), group = Status\r\n| order by label asc",
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "timeContext": {
+              "durationMs": 86400000
+            },
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          },
+          {
+            "id": "entity-type-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "EntityType",
+            "label": "?? Entity Type",
+            "type": 2,
+            "description": "Select entity type to filter actions",
+            "isRequired": false,
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "jsonData": "[{\"value\":\"Device\",\"label\":\"??? Device\"},{\"value\":\"User\",\"label\":\"?? User\"},{\"value\":\"Email\",\"label\":\"?? Email\"},{\"value\":\"IP\",\"label\":\"?? IP Address\"},{\"value\":\"File\",\"label\":\"?? File\"}]",
+            "timeContext": {
+              "durationMs": 86400000
+            },
+            "defaultValue": "Device"
+          },
+          {
+            "id": "entity-selector-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "SelectedEntity",
+            "label": "?? Entity",
+            "type": 2,
+            "description": "Select entity (auto-populated based on type)",
+            "isRequired": false,
+            "query": "// Custom endpoint: GET /api/v1/workbook/entities?tenantId={SelectedTenant}&type={EntityType}\r\n// Dynamic based on EntityType\r\nlet EntityType = '{EntityType}';\r\ndatatable(EntityId:string, EntityName:string, Type:string, Risk:string)\r\n[\r\n  \"device-001\", \"DESKTOP-ABC123\", \"Device\", \"High\",\r\n  \"device-002\", \"LAPTOP-XYZ789\", \"Device\", \"Low\",\r\n  \"user-001\", \"john.doe@contoso.com\", \"User\", \"Medium\",\r\n  \"user-002\", \"jane.smith@contoso.com\", \"User\", \"Low\"\r\n]\r\n| where Type == EntityType or EntityType == \"\"\r\n| project value = EntityId, label = strcat(EntityName, \" [Risk: \", Risk, \"]\"), group = Type",
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "timeContext": {
+              "durationMs": 86400000
+            },
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces"
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
+      },
+      "name": "global-parameters"
+    },
+    {
+      "type": 11,
+      "content": {
+        "version": "LinkItem/1.0",
+        "style": "tabs",
+        "links": [
+          {
+            "id": "tab-overview",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? Overview",
+            "subTarget": "Overview",
+            "style": "link"
+          },
+          {
+            "id": "tab-incidents",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? Incidents",
+            "subTarget": "Incidents",
+            "style": "link"
+          },
+          {
+            "id": "tab-mde",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "??? MDE",
+            "subTarget": "MDE",
+            "style": "link"
+          },
+          {
+            "id": "tab-mdo",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? MDO",
+            "subTarget": "MDO",
+            "style": "link"
+          },
+          {
+            "id": "tab-entraid",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? Entra ID",
+            "subTarget": "EntraID",
+            "style": "link"
+          },
+          {
+            "id": "tab-azure",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? Azure",
+            "subTarget": "Azure",
+            "style": "link"
+          },
+          {
+            "id": "tab-liveresponse",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? Live Response",
+            "subTarget": "LiveResponse",
+            "style": "link"
+          },
+          {
+            "id": "tab-hunting",
+            "cellValue": "SelectedTab",
+            "linkTarget": "parameter",
+            "linkLabel": "?? Advanced Hunting",
+            "subTarget": "Hunting",
+            "style": "link"
+          }
+        ]
+      },
+      "name": "main-tabs"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "title": "?? Overview Dashboard",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "## ??? SentryXDR - Unified XDR Operations Console\r\n\r\n**Tenant:** `{SelectedTenant:label}`  \r\n**Selected Incident:** `{SelectedIncident:label}`  \r\n**Entity Type:** `{EntityType}`  \r\n**Selected Entity:** `{SelectedEntity:label}`\r\n\r\n---\r\n\r\n### Quick Stats\r\n\r\nUse the tabs above to access platform-specific actions and consoles.\r\n\r\n**Available Platforms:**\r\n- ?? **Incidents:** Manage XDR incidents\r\n- ??? **MDE:** Endpoint protection actions\r\n- ?? **MDO:** Email security operations\r\n- ?? **Entra ID:** Identity & access management\r\n- ?? **Azure:** Cloud infrastructure security\r\n- ?? **Live Response:** Interactive command shell\r\n- ?? **Advanced Hunting:** KQL query console"
+            },
+            "name": "overview-text"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "SelectedTab",
+        "comparison": "isEqualTo",
+        "value": "Overview"
+      },
+      "name": "group-overview"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "title": "?? Incident Management",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "### Active Incidents\r\n\r\nSelect an incident from the dropdown above to see available actions."
+            }
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "// Custom endpoint: GET /api/v1/workbook/incidents?tenantId={SelectedTenant}\r\ndatatable(IncidentId:string, Title:string, Severity:string, Status:string, CreatedTime:datetime, AssignedTo:string)\r\n[\r\n  \"INC-12345\", \"Ransomware Detection\", \"High\", \"Active\", datetime(2025-01-15), \"SOC Analyst 1\",\r\n  \"INC-12346\", \"Phishing Campaign\", \"Medium\", \"Active\", datetime(2025-01-15), \"SOC Analyst 2\",\r\n  \"INC-12347\", \"Suspicious PowerShell\", \"Low\", \"Investigating\", datetime(2025-01-14), \"Unassigned\"\r\n]",
+              "size": 0,
+              "title": "Incidents List (Auto-Refresh)",
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [
+                  {
+                    "columnMatch": "Severity",
+                    "formatter": 18,
+                    "formatOptions": {
+                      "thresholdsOptions": "icons",
+                      "thresholdsGrid": [
+                        {
+                          "operator": "==",
+                          "thresholdValue": "High",
+                          "representation": "critical",
+                          "text": "{0}{1}"
+                        },
+                        {
+                          "operator": "==",
+                          "thresholdValue": "Medium",
+                          "representation": "warning",
+                          "text": "{0}{1}"
+                        },
+                        {
+                          "operator": "Default",
+                          "thresholdValue": null,
+                          "representation": "info",
+                          "text": "{0}{1}"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "filter": true,
+                "sortBy": [
+                  {
+                    "itemKey": "$gen_thresholds_Severity_1",
+                    "sortOrder": 1
+                  }
+                ]
+              }
+            },
+            "name": "incidents-grid"
+          },
+          {
+            "type": 11,
+            "content": {
+              "version": "LinkItem/1.0",
+              "style": "list",
+              "links": [
+                {
+                  "id": "action-update-status",
+                  "cellValue": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Solutions/applications/{sentryxdr-app}/customactions?api-version=2021-07-01",
+                  "linkTarget": "ArmAction",
+                  "linkLabel": "? Update Incident Status",
+                  "style": "primary",
+                  "linkIsContextBlade": true,
+                  "armActionContext": {
+                    "path": "updateIncidentStatus",
+                    "headers": [],
+                    "params": [
+                      {
+                        "key": "incidentId",
+                        "value": "{SelectedIncident}"
+                      },
+                      {
+                        "key": "status",
+                        "value": "Resolved"
+                      }
+                    ],
+                    "isLongOperation": false,
+                    "httpMethod": "POST",
+                    "title": "Update Incident Status",
+                    "description": "Updates the incident status to Resolved",
+                    "runLabel": "Update Status"
+                  }
+                },
+                {
+                  "id": "action-change-severity",
+                  "cellValue": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Solutions/applications/{sentryxdr-app}/customactions?api-version=2021-07-01",
+                  "linkTarget": "ArmAction",
+                  "linkLabel": "?? Change Severity",
+                  "style": "secondary",
+                  "linkIsContextBlade": true
+                },
+                {
+                  "id": "action-assign-incident",
+                  "cellValue": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Solutions/applications/{sentryxdr-app}/customactions?api-version=2021-07-01",
+                  "linkTarget": "ArmAction",
+                  "linkLabel": "?? Assign to Analyst",
+                  "style": "secondary",
+                  "linkIsContextBlade": true
+                }
+              ]
+            },
+            "conditionalVisibility": {
+              "parameterName": "SelectedIncident",
+              "comparison": "isNotEqualTo",
+              "value": ""
+            },
+            "name": "incident-actions"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "SelectedTab",
+        "comparison": "isEqualTo",
+        "value": "Incidents"
+      },
+      "name": "group-incidents"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "title": "?? Live Response Console",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "## ??? Live Response Shell\r\n\r\n**Device:** `{SelectedEntity:label}`\r\n\r\nExecute commands directly on the selected device. Supports all MDE Live Response commands.\r\n\r\n### Available Commands:\r\n- `dir` - List directory contents\r\n- `reg query` - Query registry\r\n- `processes` - List running processes\r\n- `remediate file` - Quarantine files\r\n- `run` - Execute script\r\n- `getfile` - Download file\r\n- `putfile` - Upload file (from library)"
+            }
+          },
+          {
+            "type": 9,
+            "content": {
+              "version": "KqlParameterItem/1.0",
+              "parameters": [
+                {
+                  "id": "command-input",
+                  "version": "KqlParameterItem/1.0",
+                  "name": "LiveResponseCommand",
+                  "label": "Command",
+                  "type": 1,
+                  "description": "Enter live response command",
+                  "isRequired": true,
+                  "value": "dir C:\\",
+                  "timeContext": {
+                    "durationMs": 86400000
+                  }
+                }
+              ],
+              "style": "pills",
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces"
+            }
+          },
+          {
+            "type": 11,
+            "content": {
+              "version": "LinkItem/1.0",
+              "style": "list",
+              "links": [
+                {
+                  "id": "execute-command",
+                  "cellValue": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Solutions/applications/{sentryxdr-app}/liveResponse?api-version=2021-07-01",
+                  "linkTarget": "ArmAction",
+                  "linkLabel": "?? Execute Command",
+                  "style": "primary",
+                  "linkIsContextBlade": true,
+                  "armActionContext": {
+                    "path": "/api/v1/remediation/submit",
+                    "headers": [],
+                    "params": [
+                      {
+                        "key": "deviceId",
+                        "value": "{SelectedEntity}"
+                      },
+                      {
+                        "key": "command",
+                        "value": "{LiveResponseCommand}"
+                      }
+                    ],
+                    "isLongOperation": true,
+                    "httpMethod": "POST",
+                    "title": "Execute Live Response Command",
+                    "description": "Runs {LiveResponseCommand} on device",
+                    "runLabel": "Execute"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": 1,
+            "content": {
+              "json": "### ?? Command Output\r\n\r\n*(Command results will appear here after execution)*\r\n\r\n```\r\nAwaiting command execution...\r\n```"
+            }
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "SelectedTab",
+        "comparison": "isEqualTo",
+        "value": "LiveResponse"
+      },
+      "name": "group-liveresponse"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "title": "?? Advanced Hunting Console",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "## ?? Advanced Hunting (KQL Query Editor)\r\n\r\nExecute KQL queries across Microsoft 365 Defender data."
+            }
+          },
+          {
+            "type": 9,
+            "content": {
+              "version": "KqlParameterItem/1.0",
+              "parameters": [
+                {
+                  "id": "kql-query",
+                  "version": "KqlParameterItem/1.0",
+                  "name": "HuntingQuery",
+                  "label": "KQL Query",
+                  "type": 1,
+                  "description": "Enter KQL query",
+                  "isRequired": true,
+                  "multiLine": true,
+                  "value": "DeviceProcessEvents\\n| where Timestamp > ago(1h)\\n| where ProcessCommandLine contains \\\"powershell\\\"\\n| summarize count() by DeviceName\\n| top 10 by count_",
+                  "timeContext": {
+                    "durationMs": 86400000
+                  }
+                }
+              ],
+              "style": "pills",
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces"
+            }
+          },
+          {
+            "type": 11,
+            "content": {
+              "version": "LinkItem/1.0",
+              "style": "list",
+              "links": [
+                {
+                  "id": "execute-hunting",
+                  "cellValue": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Solutions/applications/{sentryxdr-app}/advancedHunting?api-version=2021-07-01",
+                  "linkTarget": "ArmAction",
+                  "linkLabel": "?? Run Query",
+                  "style": "primary",
+                  "linkIsContextBlade": true,
+                  "armActionContext": {
+                    "path": "/api/v1/hunting/execute",
+                    "headers": [],
+                    "params": [
+                      {
+                        "key": "tenantId",
+                        "value": "{SelectedTenant}"
+                      },
+                      {
+                        "key": "query",
+                        "value": "{HuntingQuery}"
+                      }
+                    ],
+                    "isLongOperation": true,
+                    "httpMethod": "POST",
+                    "title": "Execute Advanced Hunting Query",
+                    "description": "Runs KQL query against M365 Defender",
+                    "runLabel": "Run Query"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": 1,
+            "content": {
+              "json": "### ?? Query Results\r\n\r\n*(Results will appear here after execution)*"
+            }
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "SelectedTab",
+        "comparison": "isEqualTo",
+        "value": "Hunting"
+      },
+      "name": "group-hunting"
+    }
+  ],
+  "fallbackResourceIds": [],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
