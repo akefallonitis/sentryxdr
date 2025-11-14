@@ -1,0 +1,28 @@
+// Suspicious Process Execution Detection
+// Detects unusual process creation patterns indicative of malware or attacker activity
+// Use: POST /api/v1/remediation/submit with action=RunAdvancedHuntingQuery
+
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where ProcessCommandLine has_any (
+    "powershell -enc",
+    "powershell -e ",
+    "cmd.exe /c echo",
+    "certutil -decode",
+    "bitsadmin /transfer",
+    "regsvr32 /s /u /i",
+    "mshta http",
+    "rundll32 javascript",
+    "wscript -e:jscript"
+)
+| where InitiatingProcessFileName !in ("explorer.exe", "services.exe", "svchost.exe")
+| project 
+    Timestamp,
+    DeviceName,
+    FileName,
+    ProcessCommandLine,
+    InitiatingProcessFileName,
+    InitiatingProcessCommandLine,
+    AccountName,
+    SHA256
+| order by Timestamp desc

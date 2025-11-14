@@ -1,0 +1,33 @@
+// Ransomware Behavior Detection
+// Detects mass file encryption, suspicious file extensions, and ransom note creation
+// Use: POST /api/v1/remediation/submit with action=RunAdvancedHuntingQuery
+
+DeviceFileEvents
+| where Timestamp > ago(1h)
+| where ActionType in ("FileCreated", "FileRenamed", "FileModified")
+| where FileName endswith_any (
+    ".encrypted", ".locked", ".crypto", ".crypt",
+    ".cerber", ".locky", ".zepto", ".odin",
+    ".thor", ".aesir", ".rsa", ".wnry",
+    ".wcry", ".wncry"
+) or FileName =~ "README.txt" or FileName =~ "HOW_TO_DECRYPT.txt"
+| summarize 
+    FileCount = count(),
+    UniqueExtensions = dcount(FileName),
+    FirstSeen = min(Timestamp),
+    LastSeen = max(Timestamp),
+    ProcessList = make_set(InitiatingProcessFileName),
+    FileList = make_list(FileName, 10)
+    by DeviceName, InitiatingProcessFileName, InitiatingProcessSHA256, AccountName
+| where FileCount > 10 // More than 10 files modified rapidly
+| project
+    FirstSeen,
+    LastSeen,
+    DeviceName,
+    InitiatingProcessFileName,
+    InitiatingProcessSHA256,
+    AccountName,
+    FileCount,
+    UniqueExtensions,
+    FileList
+| order by FileCount desc

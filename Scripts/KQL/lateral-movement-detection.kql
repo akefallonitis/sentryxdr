@@ -1,0 +1,31 @@
+// Lateral Movement Detection
+// Detects Pass-the-Hash, WMI, PSExec, and other lateral movement techniques
+// Use: POST /api/v1/remediation/submit with action=RunAdvancedHuntingQuery
+
+DeviceNetworkEvents
+| where Timestamp > ago(24h)
+| where RemotePort in (445, 135, 139, 3389, 5985, 5986) // SMB, RPC, RDP, WinRM
+| where InitiatingProcessFileName in (
+    "powershell.exe",
+    "cmd.exe",
+    "wmic.exe",
+    "psexec.exe",
+    "wmiprvse.exe",
+    "mmc.exe"
+)
+| join kind=inner (
+    DeviceLogonEvents
+    | where Timestamp > ago(24h)
+    | where LogonType in ("Network", "RemoteInteractive", "NetworkCleartext")
+    | where AccountName != ""
+) on DeviceName, $left.Timestamp == $right.Timestamp
+| project
+    Timestamp,
+    DeviceName,
+    RemoteIP,
+    RemotePort,
+    InitiatingProcessFileName,
+    InitiatingProcessCommandLine,
+    AccountName,
+    LogonType
+| order by Timestamp desc

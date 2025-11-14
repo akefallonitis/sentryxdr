@@ -1,0 +1,31 @@
+// Suspicious Registry Modifications Detection
+// Detects registry changes used for persistence (Run keys, Startup folders, etc.)
+// Use: POST /api/v1/remediation/submit with action=RunAdvancedHuntingQuery
+
+DeviceRegistryEvents
+| where Timestamp > ago(24h)
+| where ActionType in ("RegistryValueSet", "RegistryKeyCreated")
+| where RegistryKey has_any (
+    // Common persistence locations
+    "\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+    "\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
+    "\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+    "\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders",
+    "\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
+    "\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
+    "\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options",
+    "\\System\\CurrentControlSet\\Services",
+    "\\Software\\Classes\\exefile\\shell\\open\\command"
+)
+| where InitiatingProcessFileName !in ("services.exe", "svchost.exe", "msiexec.exe", "setup.exe")
+| project
+    Timestamp,
+    DeviceName,
+    RegistryKey,
+    RegistryValueName,
+    RegistryValueData,
+    InitiatingProcessFileName,
+    InitiatingProcessCommandLine,
+    InitiatingProcessSHA256,
+    AccountName
+| order by Timestamp desc
