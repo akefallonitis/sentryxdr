@@ -92,7 +92,7 @@ namespace SentryXDR.Services.Workers
                     },
                     grantControls = new
                     {
-                        operator = "OR",
+                        @operator = "OR",
                         builtInControls = new[] { "block" }
                     },
                     sessionControls = null
@@ -193,7 +193,7 @@ namespace SentryXDR.Services.Workers
                     },
                     grantControls = new
                     {
-                        operator = "OR",
+                        @operator = "OR",
                         builtInControls = new[] { "block" }
                     }
                 };
@@ -297,7 +297,7 @@ namespace SentryXDR.Services.Workers
                     },
                     grantControls = new
                     {
-                        operator = "OR",
+                        @operator = "OR",
                         builtInControls = new[] { "block" }
                     }
                 };
@@ -372,7 +372,7 @@ namespace SentryXDR.Services.Workers
                     },
                     grantControls = new
                     {
-                        operator = "OR",
+                        @operator = "OR",
                         builtInControls = new[] { "compliantDevice" } // Require compliant device only, no MFA
                     }
                 };

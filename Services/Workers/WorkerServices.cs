@@ -74,46 +74,7 @@ namespace SentryXDR.Services.Workers
     }
 
     // ==================== MCAS (Microsoft Defender for Cloud Apps) ====================
-    public interface IMCASApiService
-    {
-        Task<XDRRemediationResponse> SuspendUserAsync(XDRRemediationRequest request);
-        Task<XDRRemediationResponse> RevokeUserSessionsAsync(XDRRemediationRequest request);
-    }
-
-    public interface IMCASWorkerService : IMCASApiService { }
-    
-    public class MCASApiService : IMCASApiService
-    {
-        public async Task<XDRRemediationResponse> SuspendUserAsync(XDRRemediationRequest request)
-        {
-            return await Task.FromResult(new XDRRemediationResponse
-            {
-                RequestId = request.RequestId,
-                Success = true,
-                Status = "Pending",
-                Message = "User suspended - MCAS implementation pending"
-            });
-        }
-
-        public async Task<XDRRemediationResponse> RevokeUserSessionsAsync(XDRRemediationRequest request)
-        {
-            return await Task.FromResult(new XDRRemediationResponse
-            {
-                RequestId = request.RequestId,
-                Success = true,
-                Status = "Pending",
-                Message = "User sessions revoked - MCAS implementation pending"
-            });
-        }
-    }
-
-    public class MCASWorkerService : IMCASWorkerService
-    {
-        private readonly IMCASApiService _apiService;
-        public MCASWorkerService(IMCASApiService apiService) => _apiService = apiService;
-        public Task<XDRRemediationResponse> SuspendUserAsync(XDRRemediationRequest request) => _apiService.SuspendUserAsync(request);
-        public Task<XDRRemediationResponse> RevokeUserSessionsAsync(XDRRemediationRequest request) => _apiService.RevokeUserSessionsAsync(request);
-    }
+    // Complete implementation in MCASService.cs (12 actions)
 
     // ==================== MDI (Microsoft Defender for Identity) ====================
     public interface IMDIApiService

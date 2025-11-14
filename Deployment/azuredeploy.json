@@ -70,6 +70,13 @@
         "description": "GitHub repository branch"
       }
     },
+    "packageUrl": {
+      "type": "string",
+      "defaultValue": "https://github.com/akefallonitis/sentryxdr/releases/download/v1.0.0/sentryxdr-deploy.zip",
+      "metadata": {
+        "description": "Direct URL to deployment package ZIP (GitHub Release or Azure Storage)"
+      }
+    },
     "projectTag": {
       "type": "string",
       "defaultValue": "SentryXDR",
@@ -88,7 +95,7 @@
       "type": "bool",
       "defaultValue": false,
       "metadata": {
-        "description": "Enable GitHub source control integration"
+        "description": "Enable GitHub source control integration (alternative to package URL)"
       }
     }
   },
@@ -344,7 +351,7 @@
             },
             {
               "name": "WEBSITE_RUN_FROM_PACKAGE",
-              "value": "[variables('packageUri')]"
+              "value": "[parameters('packageUrl')]"
             }
           ]
         }
