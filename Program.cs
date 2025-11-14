@@ -60,19 +60,23 @@ var host = new HostBuilder()
         services.AddSingleton<IStorageService, StorageService>();
         services.AddSingleton<IHistoryService, HistoryService>();
         
-        // Blob Service Client
+        // Blob Service Client - reads from Function App environment variable
         services.AddSingleton(sp =>
         {
-            var connectionString = configuration["Storage:ConnectionString"] 
-                ?? configuration["AzureWebJobsStorage"];
+            // Function Apps automatically provide AzureWebJobsStorage
+            var connectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage") 
+                ?? configuration["AzureWebJobsStorage"]
+                ?? throw new InvalidOperationException("AzureWebJobsStorage environment variable not found");
             return new BlobServiceClient(connectionString);
         });
         
-        // Table Service Client
+        // Table Service Client - reads from Function App environment variable
         services.AddSingleton(sp =>
         {
-            var connectionString = configuration["Storage:ConnectionString"] 
-                ?? configuration["AzureWebJobsStorage"];
+            // Function Apps automatically provide AzureWebJobsStorage
+            var connectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage") 
+                ?? configuration["AzureWebJobsStorage"]
+                ?? throw new InvalidOperationException("AzureWebJobsStorage environment variable not found");
             return new TableServiceClient(connectionString);
         });
         

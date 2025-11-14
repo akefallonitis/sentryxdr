@@ -1,0 +1,148 @@
+# Azure DevOps Pipeline for SentryXDR
+# Builds, tests, and deploys the Azure Function
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    exclude:
+    - '*.md'
+    - 'docs/*'
+
+pr:
+  branches:
+    include:
+    - main
+    - develop
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetSdkVersion: '8.x'
+  functionAppName: 'sentryxdr-$(Build.BuildId)'
+  azureSubscription: 'SentryXDR-ServiceConnection' # Create in Azure DevOps
+
+stages:
+- stage: Build
+  displayName: 'Build & Test'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build SentryXDR'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        version: $(dotnetSdkVersion)
+        includePreviewVersions: false
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet packages'
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Build solution'
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Run unit tests'
+      inputs:
+        command: 'test'
+        projects: '**/*Tests.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-build'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish application'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/SentryXDR.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish artifacts'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: DeployDev
+  displayName: 'Deploy to Development'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  jobs:
+  - deployment: DeployDev
+    displayName: 'Deploy to Dev Environment'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'Development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy to Azure Function'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'functionApp'
+              appName: '$(functionAppName)-dev'
+              package: '$(System.ArtifactsDirectory)/drop/*.zip'
+              deploymentMethod: 'auto'
+
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployProd
+    displayName: 'Deploy to Production'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - task: AzureFunctionApp@1
+            displayName: 'Deploy to Azure Function'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              appType: 'functionApp'
+              appName: '$(functionAppName)-prod'
+              package: '$(System.ArtifactsDirectory)/drop/*.zip'
+              deploymentMethod: 'auto'
+          
+          - task: AzureCLI@2
+            displayName: 'Warm up Function App'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Warming up Function App..."
+                curl -s https://$(functionAppName)-prod.azurewebsites.net/api/health || true
+                sleep 10
+                curl -s https://$(functionAppName)-prod.azurewebsites.net/api/health
