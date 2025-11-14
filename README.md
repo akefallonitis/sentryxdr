@@ -8,7 +8,8 @@
 
 ## ?? Key Features
 
-- ? **237 Remediation Actions** across 7 Microsoft security platforms
+- ? **180 Remediation Actions** across 10 Microsoft security services (v1.0)
+- ?? **57 Additional Actions** planned for v2.0 (MCAS, MDI, extended features)
 - ? **Multi-Tenant Architecture** with Azure Managed Identity
 - ? **Native API Integration** - No custom tables required
 - ? **REST API Gateway** with Swagger/OpenAPI
@@ -35,13 +36,13 @@
 ## ??? Architecture
 
 ```
-Azure Workbook (Control Plane - Optional)
+Azure Workbook (Control Plane - v2.0)
     ?
 Application Insights (Monitoring)
     ?
 REST API Gateway (Main Entry Point)
     ?
-Worker Services (12 Services)
+Worker Services (10 Services - v1.0)
     ?
 Native Microsoft APIs
     ??? Microsoft Graph API
@@ -60,18 +61,23 @@ Native Microsoft APIs
 
 ## ?? Supported Platforms
 
-| Platform | Actions | Status |
-|----------|---------|--------|
-| **Microsoft Defender for Endpoint (MDE)** | 37 | ? Complete |
-| **Microsoft Defender for Office 365 (MDO)** | 35 | ? Complete |
-| **Microsoft Entra ID** | 26 | ? Complete |
-| **Microsoft Intune** | 28 | ? Complete |
-| **Azure Security** | 15 | ? Complete |
-| **Threat Intelligence** | 8 | ? Complete |
-| **Advanced Hunting** | 2 | ? Complete |
-| **Live Response** | 7 | ? Complete |
+| Platform | Actions | Status | Version |
+|----------|---------|--------|---------|
+| **Microsoft Defender for Endpoint (MDE)** | 40 | ? Complete | v1.0 |
+| **Microsoft Defender for Office 365 (MDO)** | 39 | ? Complete | v1.0 |
+| **Microsoft Entra ID** | 26 | ? Complete | v1.0 |
+| **Microsoft Intune** | 28 | ? Complete | v1.0 |
+| **Azure Security** | 15 | ? Complete | v1.0 |
+| **Threat Intelligence** | 8 | ? Complete | v1.0 |
+| **Advanced Hunting** | 2 | ? Complete | v1.0 |
+| **Live Response** | 7 | ? Complete | v1.0 |
+| **Incident Management** | 3 | ? Complete | v1.0 |
+| **REST Gateway** | 12 | ? Complete | v1.0 |
+| **Microsoft Defender for Cloud Apps (MCAS)** | 23 | ?? Planned | v2.0 |
+| **Microsoft Defender for Identity (MDI)** | 20 | ?? Planned | v2.0 |
 
-**Total**: **237 Actions**
+**Total v1.0**: **180 Actions** (Production-Ready)  
+**Total v2.0**: **237 Actions** (Planned - MCAS, MDI, extended features)
 
 ## ?? Prerequisites
 
