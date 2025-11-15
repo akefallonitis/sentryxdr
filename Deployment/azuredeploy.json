@@ -91,6 +91,13 @@
         "description": "Created by tag"
       }
     },
+    "deleteAtTag": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional: Set deletion date (format: YYYY-MM-DD) for automatic resource cleanup. Leave empty to keep resources indefinitely."
+      }
+    },
     "enableSourceControl": {
       "type": "bool",
       "defaultValue": false,
@@ -122,7 +129,7 @@
       "Criticality": "High",
       "DisasterRecovery": "Required",
       "MaintenanceWindow": "Sunday 02:00-06:00 UTC",
-      "deleteAtTag": ""
+      "deleteAtTag": "[parameters('deleteAtTag')]"
     }
   },
   "resources": [
