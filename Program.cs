@@ -52,7 +52,7 @@ var host = new HostBuilder()
         services.AddScoped<IMDOWorkerService>(sp => sp.GetRequiredService<IMDOApiService>() as IMDOWorkerService);
         services.AddScoped<IEntraIDWorkerService, EntraIDApiService>();
         services.AddScoped<IIntuneWorkerService, IntuneApiService>();
-        services.AddScoped<IMCASWorkerService, MCASWorkerService>();
+        services.AddScoped<IMCASApiService, MCASApiService>();
         services.AddScoped<IMDIWorkerService, MDIWorkerService>();
         
         // Storage services
