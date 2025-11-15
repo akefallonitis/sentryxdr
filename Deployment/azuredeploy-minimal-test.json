@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "SentryXDR - MINIMAL TEST - Find policy issue"
+  },
+  "parameters": {
+    "testTag": {
+      "type": "string",
+      "defaultValue": "test",
+      "metadata": {
+        "description": "Test tag value"
+      }
+    }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id)]",
+    "storageName": "[concat('sentrytest', take(variables('suffix'), 8))]",
+    "commonTags": {
+      "Project": "SentryXDR",
+      "Environment": "prod",
+      "CreatedBy": "alex",
+      "ManagedBy": "ARM Template",
+      "Version": "1.0.0",
+      "ApplicationName": "SentryXDR",
+      "BusinessUnit": "Security Operations",
+      "CostCenter": "SOC",
+      "DataClassification": "Confidential",
+      "Criticality": "High",
+      "DisasterRecovery": "Required",
+      "MaintenanceWindow": "Sunday 02:00-06:00 UTC",
+      "deleteAtTag": ""
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2021-09-01",
+      "name": "[variables('storageName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false
+      },
+      "tags": "[variables('commonTags')]"
+    }
+  ],
+  "outputs": {
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('storageName')]"
+    }
+  }
+}
