@@ -215,7 +215,8 @@
           "enabled": true,
           "days": 7
         }
-      }
+      },
+      "tags": "[variables('commonTags')]"
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
@@ -226,7 +227,8 @@
       ],
       "properties": {
         "publicAccess": "None"
-      }
+      },
+      "tags": "[variables('commonTags')]"
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
@@ -237,7 +239,8 @@
       ],
       "properties": {
         "publicAccess": "None"
-      }
+      },
+      "tags": "[variables('commonTags')]"
     },
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
@@ -248,7 +251,8 @@
       ],
       "properties": {
         "publicAccess": "None"
-      }
+      },
+      "tags": "[variables('commonTags')]"
     },
     {
       "type": "Microsoft.Web/serverfarms",
