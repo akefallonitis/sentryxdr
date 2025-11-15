@@ -74,10 +74,10 @@ namespace SentryXDR.Services.Workers
                     $"{MDEBaseUrl}/machines/{machineId}/startInvestigation",
                     investigationRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var investigationId = result.Data.Value.GetProperty("id").GetString();
-                    var status = result.Data.Value.GetProperty("status").GetString();
+                    var investigationId = result.Data.GetProperty("id").GetString();
+                    var status = result.Data.GetProperty("status").GetString();
                     
                     LogOperationComplete(request, "TriggerAutomatedInvestigation", DateTime.UtcNow - startTime, true);
                     
@@ -118,9 +118,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await GetJsonAsync<JsonElement>($"{MDEBaseUrl}/investigations/{investigationId}");
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var investigation = result.Data.Value;
+                    var investigation = result.Data;
                     var state = investigation.GetProperty("state").GetString();
                     var status = investigation.GetProperty("status").GetString();
                     var machineId = investigation.GetProperty("machineId").GetString();
@@ -266,9 +266,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await GetJsonAsync<JsonElement>($"{MDEBaseUrl}/machineactions/{actionId}");
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var action = result.Data.Value;
+                    var action = result.Data;
                     var status = action.GetProperty("status").GetString();
                     var type = action.GetProperty("type").GetString();
                     var machineId = action.GetProperty("machineId").GetString();
@@ -344,3 +344,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+

@@ -96,8 +96,7 @@ namespace SentryXDR.Services.Workers
                 var errorContent = await response.Content.ReadAsStringAsync();
                 return CreateFailureResponse(
                     request,
-                    $"Failed to disable mail forwarding: {response.ReasonPhrase}",
-                    errorContent,
+                    $"Failed to disable mail forwarding: {response.ReasonPhrase} - {errorContent}",
                     startTime);
             }
             catch (Exception ex)
@@ -163,8 +162,7 @@ namespace SentryXDR.Services.Workers
                 var errorContent = await response.Content.ReadAsStringAsync();
                 return CreateFailureResponse(
                     request,
-                    $"Failed to enable mail forwarding: {response.ReasonPhrase}",
-                    errorContent,
+                    $"Failed to enable mail forwarding: {response.ReasonPhrase} - {errorContent}",
                     startTime);
             }
             catch (Exception ex)
@@ -224,8 +222,7 @@ namespace SentryXDR.Services.Workers
                 var errorContent = await response.Content.ReadAsStringAsync();
                 return CreateFailureResponse(
                     request,
-                    $"Failed to get mail forwarding status: {response.ReasonPhrase}",
-                    errorContent,
+                    $"Failed to get mail forwarding status: {response.ReasonPhrase} - {errorContent}",
                     startTime);
             }
             catch (Exception ex)

@@ -88,9 +88,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await PostJsonAsync<JsonElement>($"{MdeBaseUrl}/indicators", indicator);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var indicatorId = result.Data.Value.GetProperty("id").GetString();
+                    var indicatorId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "SubmitFileHashIndicator", DateTime.UtcNow - startTime, true);
                     
@@ -152,9 +152,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await PostJsonAsync<JsonElement>($"{MdeBaseUrl}/indicators", indicator);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var indicatorId = result.Data.Value.GetProperty("id").GetString();
+                    var indicatorId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "SubmitIPAddressIndicator", DateTime.UtcNow - startTime, true);
                     
@@ -215,9 +215,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await PostJsonAsync<JsonElement>($"{MdeBaseUrl}/indicators", indicator);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var indicatorId = result.Data.Value.GetProperty("id").GetString();
+                    var indicatorId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "SubmitURLIndicator", DateTime.UtcNow - startTime, true);
                     
@@ -278,9 +278,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await PostJsonAsync<JsonElement>($"{MdeBaseUrl}/indicators", indicator);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var indicatorId = result.Data.Value.GetProperty("id").GetString();
+                    var indicatorId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "SubmitDomainIndicator", DateTime.UtcNow - startTime, true);
                     
@@ -357,9 +357,9 @@ namespace SentryXDR.Services.Workers
 
                 var result = await PostJsonAsync<JsonElement>($"{MdeBaseUrl}/indicators/import", batchRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var response = result.Data.Value;
+                    var response = result.Data;
                     var successCount = response.GetProperty("successCount").GetInt32();
                     var failureCount = response.GetProperty("failureCount").GetInt32();
                     
@@ -480,3 +480,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+

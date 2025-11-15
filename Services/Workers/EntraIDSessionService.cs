@@ -67,9 +67,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/users/{userId}/revokeSignInSessions", 
                     new { });
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var success = result.Data.Value.GetProperty("value").GetBoolean();
+                    var success = result.Data.GetProperty("value").GetBoolean();
                     
                     if (success)
                     {
@@ -120,9 +120,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBetaUrl}/users/{userId}/invalidateAllRefreshTokens",
                     new { });
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var success = result.Data.Value.GetProperty("value").GetBoolean();
+                    var success = result.Data.GetProperty("value").GetBoolean();
                     
                     if (success)
                     {
@@ -221,12 +221,12 @@ namespace SentryXDR.Services.Workers
                 // Step 1: Get all authentication methods
                 var getResult = await GetJsonAsync<JsonElement>($"{GraphBaseUrl}/users/{userId}/authentication/methods");
 
-                if (!getResult.Success || !getResult.Data.HasValue)
+                if (!getResult.Success || getResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, getResult.Error ?? "Failed to retrieve authentication methods", startTime);
                 }
 
-                var methods = getResult.Data.Value.GetProperty("value").EnumerateArray().ToList();
+                var methods = getResult.Data.GetProperty("value").EnumerateArray().ToList();
                 var deletedMethods = new List<string>();
                 var failedMethods = new List<string>();
 
@@ -326,3 +326,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+

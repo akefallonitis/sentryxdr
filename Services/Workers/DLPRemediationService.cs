@@ -74,12 +74,12 @@ namespace SentryXDR.Services.Workers
                 var permissionsResult = await GetJsonAsync<JsonElement>(
                     $"{GraphBaseUrl}/drives/{driveId}/items/{itemId}/permissions");
 
-                if (!permissionsResult.Success || !permissionsResult.Data.HasValue)
+                if (!permissionsResult.Success || permissionsResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, "Unable to get file permissions", startTime);
                 }
 
-                var permissions = permissionsResult.Data.Value.GetProperty("value");
+                var permissions = permissionsResult.Data.GetProperty("value");
                 var removedCount = 0;
 
                 // Step 2: Remove external/anonymous permissions
@@ -199,15 +199,15 @@ namespace SentryXDR.Services.Workers
                 var permissionsResult = await GetJsonAsync<JsonElement>(
                     $"{GraphBaseUrl}/drives/{driveId}/items/{itemId}/permissions");
 
-                if (!permissionsResult.Success || !permissionsResult.Data.HasValue)
+                if (!permissionsResult.Success || permissionsResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, "Unable to get file permissions", startTime);
                 }
 
-                // Remove inherited permissions
-                var permissions = permissionsResult.Data.Value.GetProperty("value");
+                var permissions = permissionsResult.Data.GetProperty("value");
                 var removedCount = 0;
 
+                // Remove inherited permissions
                 foreach (var permission in permissions.EnumerateArray())
                 {
                     var isInherited = permission.TryGetProperty("inheritedFrom", out var _);
@@ -275,9 +275,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/drives/{driveId}/items/{itemId}",
                     moveRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var newLocation = result.Data.Value.GetProperty("parentReference").GetProperty("path").GetString();
+                    var newLocation = result.Data.GetProperty("parentReference").GetProperty("path").GetString();
                     
                     LogOperationComplete(request, "QuarantineSensitiveFile", DateTime.UtcNow - startTime, true);
                     
@@ -391,3 +391,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+

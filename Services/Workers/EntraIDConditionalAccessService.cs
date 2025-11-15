@@ -94,17 +94,16 @@ namespace SentryXDR.Services.Workers
                     {
                         @operator = "OR",
                         builtInControls = new[] { "block" }
-                    },
-                    sessionControls = null
+                    }
                 };
 
                 var result = await PostJsonAsync<JsonElement>(
                     $"{GraphBaseUrl}/identity/conditionalAccess/policies",
                     policy);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var policyId = result.Data.Value.GetProperty("id").GetString();
+                    var policyId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "CreateEmergencyBlockPolicy", DateTime.UtcNow - startTime, true);
                     
@@ -146,7 +145,7 @@ namespace SentryXDR.Services.Workers
                     return failureResponse!;
                 }
 
-                var countryCode = request.Parameters["countryCode"]!.ToString()!; // ISO 3166-1 alpha-2 (e.g., "RU", "CN")
+                var countryCode = request.Parameters["countryCode"]!.ToString!; // ISO 3166-1 alpha-2 (e.g., "RU", "CN")
                 var locationName = GetOptionalParameter(request, "locationName", $"Blocked-{countryCode}-{DateTime.UtcNow:yyyyMMdd}");
 
                 Logger.LogCritical("BLOCK LOCATION: Blocking geographic location {CountryCode}", countryCode);
@@ -164,12 +163,12 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/identity/conditionalAccess/namedLocations",
                     namedLocation);
 
-                if (!locationResult.Success || !locationResult.Data.HasValue)
+                if (!locationResult.Success || locationResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, locationResult.Error ?? "Failed to create named location", startTime);
                 }
 
-                var locationId = locationResult.Data.Value.GetProperty("id").GetString();
+                var locationId = locationResult.Data.GetProperty("id").GetString();
 
                 // Step 2: Create blocking policy
                 var policy = new
@@ -202,9 +201,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/identity/conditionalAccess/policies",
                     policy);
 
-                if (policyResult.Success && policyResult.Data.HasValue)
+                if (policyResult.Success && policyResult.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var policyId = policyResult.Data.Value.GetProperty("id").GetString();
+                    var policyId = policyResult.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "BlockGeographicLocation", DateTime.UtcNow - startTime, true);
                     
@@ -268,12 +267,12 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/identity/conditionalAccess/namedLocations",
                     namedLocation);
 
-                if (!locationResult.Success || !locationResult.Data.HasValue)
+                if (!locationResult.Success || locationResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, locationResult.Error ?? "Failed to create named location", startTime);
                 }
 
-                var locationId = locationResult.Data.Value.GetProperty("id").GetString();
+                var locationId = locationResult.Data.GetProperty("id").GetString();
 
                 // Step 2: Create blocking policy
                 var policy = new
@@ -306,9 +305,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/identity/conditionalAccess/policies",
                     policy);
 
-                if (policyResult.Success && policyResult.Data.HasValue)
+                if (policyResult.Success && policyResult.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var policyId = policyResult.Data.Value.GetProperty("id").GetString();
+                    var policyId = policyResult.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "BlockIPRange", DateTime.UtcNow - startTime, true);
                     
@@ -381,9 +380,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/identity/conditionalAccess/policies",
                     policy);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var policyId = result.Data.Value.GetProperty("id").GetString();
+                    var policyId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "EnableBreakGlassPolicy", DateTime.UtcNow - startTime, true);
                     
@@ -513,9 +512,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBaseUrl}/identity/conditionalAccess/namedLocations",
                     namedLocation);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var locationId = result.Data.Value.GetProperty("id").GetString();
+                    var locationId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "CreateBlockedNamedLocation", DateTime.UtcNow - startTime, true);
                     
@@ -630,3 +629,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+

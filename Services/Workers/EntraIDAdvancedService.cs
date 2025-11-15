@@ -75,12 +75,12 @@ namespace SentryXDR.Services.Workers
                 var assignmentsUrl = $"{GraphBaseUrl}/roleManagement/directory/roleAssignments?$filter=principalId eq '{userId}' and roleDefinitionId eq '{roleId}'";
                 var assignmentsResult = await GetJsonAsync<JsonElement>(assignmentsUrl);
 
-                if (!assignmentsResult.Success || !assignmentsResult.Data.HasValue)
+                if (!assignmentsResult.Success || assignmentsResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, "Unable to find role assignment", startTime);
                 }
 
-                var assignments = assignmentsResult.Data.Value.GetProperty("value");
+                var assignments = assignmentsResult.Data.GetProperty("value");
                 if (assignments.GetArrayLength() == 0)
                 {
                     return CreateFailureResponse(request, "No role assignment found for this user", startTime);
@@ -140,12 +140,12 @@ namespace SentryXDR.Services.Workers
                 var grantsUrl = $"{GraphBaseUrl}/oauth2PermissionGrants?$filter=clientId eq '{servicePrincipalId}'";
                 var grantsResult = await GetJsonAsync<JsonElement>(grantsUrl);
 
-                if (!grantsResult.Success || !grantsResult.Data.HasValue)
+                if (!grantsResult.Success || grantsResult.Data.ValueKind == JsonValueKind.Undefined)
                 {
                     return CreateFailureResponse(request, "Unable to find permission grants", startTime);
                 }
 
-                var grants = grantsResult.Data.Value.GetProperty("value");
+                var grants = grantsResult.Data.GetProperty("value");
                 var revokedCount = 0;
 
                 // Delete each grant
@@ -386,3 +386,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+

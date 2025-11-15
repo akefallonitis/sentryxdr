@@ -96,10 +96,10 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBetaUrl}/security/analyzedEmails/remediate",
                     remediationRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var remediationId = result.Data.Value.GetProperty("id").GetString();
-                    var status = result.Data.Value.GetProperty("status").GetString();
+                    var remediationId = result.Data.GetProperty("id").GetString();
+                    var status = result.Data.GetProperty("status").GetString();
                     
                     LogOperationComplete(request, "RemediateEmails", DateTime.UtcNow - startTime, true);
                     
@@ -164,9 +164,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphV1Url}/security/threatSubmission/emailThreats",
                     submission);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var submissionId = result.Data.Value.GetProperty("id").GetString();
+                    var submissionId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "BlockEmailSender", DateTime.UtcNow - startTime, true);
                     
@@ -225,9 +225,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphV1Url}/security/threatSubmission/emailThreats",
                     submission);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var submissionId = result.Data.Value.GetProperty("id").GetString();
+                    var submissionId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "BlockEmailDomain", DateTime.UtcNow - startTime, true);
                     
@@ -285,9 +285,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphV1Url}/security/threatSubmission/urlThreats",
                     submission);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var submissionId = result.Data.Value.GetProperty("id").GetString();
+                    var submissionId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "BlockURL", DateTime.UtcNow - startTime, true);
                     
@@ -345,9 +345,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphV1Url}/security/threatSubmission/emailThreats",
                     submission);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var submissionId = result.Data.Value.GetProperty("id").GetString();
+                    var submissionId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "AllowSender", DateTime.UtcNow - startTime, true);
                     
@@ -445,9 +445,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBetaUrl}/security/analyzedEmails/remediate",
                     zapRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var remediationId = result.Data.Value.GetProperty("id").GetString();
+                    var remediationId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "TriggerZAPForPhishing", DateTime.UtcNow - startTime, true);
                     
@@ -505,9 +505,9 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBetaUrl}/security/analyzedEmails/remediate",
                     zapRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var remediationId = result.Data.Value.GetProperty("id").GetString();
+                    var remediationId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "TriggerZAPForMalware", DateTime.UtcNow - startTime, true);
                     
@@ -566,10 +566,10 @@ namespace SentryXDR.Services.Workers
                     $"{GraphBetaUrl}/security/collaboration/analyzedEmails",
                     analysisRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var analysisId = result.Data.Value.GetProperty("id").GetString();
-                    var status = result.Data.Value.GetProperty("analysisStatus").GetString();
+                    var analysisId = result.Data.GetProperty("id").GetString();
+                    var status = result.Data.GetProperty("analysisStatus").GetString();
                     
                     LogOperationComplete(request, "AnalyzeEmailForThreats", DateTime.UtcNow - startTime, true);
                     
@@ -621,12 +621,12 @@ namespace SentryXDR.Services.Workers
                 };
 
                 var result = await PostJsonAsync<JsonElement>(
-                    $"{GraphBaseUrl}/security/threatSubmission/urlThreats",
+                    $"{GraphBetaUrl}/security/threatSubmission/urlThreats",
                     detonationRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var submissionId = result.Data.Value.GetProperty("id").GetString();
+                    var submissionId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "DetonateURLInSandbox", DateTime.UtcNow - startTime, true);
                     
@@ -683,12 +683,12 @@ namespace SentryXDR.Services.Workers
                 };
 
                 var result = await PostJsonAsync<JsonElement>(
-                    $"{GraphBaseUrl}/security/threatSubmission/fileThreats",
+                    $"{GraphBetaUrl}/security/threatSubmission/fileThreats",
                     detonationRequest);
 
-                if (result.Success && result.Data.HasValue)
+                if (result.Success && result.Data.ValueKind != JsonValueKind.Undefined)
                 {
-                    var submissionId = result.Data.Value.GetProperty("id").GetString();
+                    var submissionId = result.Data.GetProperty("id").GetString();
                     
                     LogOperationComplete(request, "DetonateFileInSandbox", DateTime.UtcNow - startTime, true);
                     
@@ -711,3 +711,4 @@ namespace SentryXDR.Services.Workers
         }
     }
 }
+
