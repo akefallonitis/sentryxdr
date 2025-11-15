@@ -121,7 +121,8 @@
       "DataClassification": "Confidential",
       "Criticality": "High",
       "DisasterRecovery": "Required",
-      "MaintenanceWindow": "Sunday 02:00-06:00 UTC"
+      "MaintenanceWindow": "Sunday 02:00-06:00 UTC",
+      "deleteAtTag": ""
     }
   },
   "resources": [
@@ -471,3 +472,4 @@
     }
   }
 }
+
