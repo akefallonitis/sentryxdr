@@ -120,18 +120,8 @@
     "skuTier": "[if(equals(parameters('functionAppSku'), 'Y1'), 'Dynamic', if(startsWith(parameters('functionAppSku'), 'EP'), 'ElasticPremium', if(startsWith(parameters('functionAppSku'), 'P'), 'PremiumV2', if(startsWith(parameters('functionAppSku'), 'B'), 'Basic', 'Standard'))))]",
     "commonTags": {
       "Project": "[parameters('projectTag')]",
-      "Environment": "[parameters('environment')]",
       "CreatedBy": "[parameters('createdByTag')]",
-      "ManagedBy": "ARM Template",
-      "Version": "1.0.0",
-      "ApplicationName": "SentryXDR",
-      "BusinessUnit": "Security Operations",
-      "CostCenter": "SOC",
-      "DataClassification": "Confidential",
-      "Criticality": "High",
-      "DisasterRecovery": "Required",
-      "MaintenanceWindow": "Sunday 02:00-06:00 UTC",
-      "deleteAtTag": "[parameters('deleteAtTag')]"
+      "DeleteAt": "[parameters('deleteAtTag')]"
     }
   },
   "resources": [
