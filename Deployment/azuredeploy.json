@@ -50,10 +50,10 @@
     },
     "functionAppSku": {
       "type": "string",
-      "defaultValue": "EP1",
-      "allowedValues": ["EP1", "EP2", "EP3"],
+      "defaultValue": "Y1",
+      "allowedValues": ["Y1", "EP1", "EP2", "EP3", "B1", "B2", "B3", "S1", "S2", "S3", "P1V2", "P2V2", "P3V2"],
       "metadata": {
-        "description": "Function App Premium SKU"
+        "description": "Function App SKU (Y1=Consumption, EP=Premium, B=Basic, S=Standard, P=Premium V2)"
       }
     },
     "repoUrl": {
@@ -116,6 +116,8 @@
     "automationName": "[concat(parameters('projectName'), '-auto-', variables('suffix'))]",
     "logWorkspaceName": "[concat(parameters('projectName'), '-logs-', variables('suffix'))]",
     "packageUri": "[concat(parameters('repoUrl'), '/releases/download/v1.0.0/sentryxdr-package.zip')]",
+    "skuFamily": "[if(startsWith(parameters('functionAppSku'), 'EP'), 'EP', if(startsWith(parameters('functionAppSku'), 'P'), 'P', if(startsWith(parameters('functionAppSku'), 'B'), 'B', if(startsWith(parameters('functionAppSku'), 'S'), 'S', 'Y'))))]",
+    "skuTier": "[if(equals(parameters('functionAppSku'), 'Y1'), 'Dynamic', if(startsWith(parameters('functionAppSku'), 'EP'), 'ElasticPremium', if(startsWith(parameters('functionAppSku'), 'P'), 'PremiumV2', if(startsWith(parameters('functionAppSku'), 'B'), 'Basic', 'Standard'))))]",
     "commonTags": {
       "Project": "[parameters('projectTag')]",
       "Environment": "[parameters('environment')]",
@@ -261,15 +263,15 @@
       "location": "[parameters('location')]",
       "sku": {
         "name": "[parameters('functionAppSku')]",
-        "tier": "ElasticPremium",
+        "tier": "[variables('skuTier')]",
         "size": "[parameters('functionAppSku')]",
-        "family": "EP"
+        "family": "[variables('skuFamily')]"
       },
-      "kind": "elastic",
+      "kind": "[if(startsWith(parameters('functionAppSku'), 'EP'), 'elastic', if(equals(parameters('functionAppSku'), 'Y1'), 'functionapp', 'app'))]",
       "properties": {
         "perSiteScaling": false,
-        "elasticScaleEnabled": true,
-        "maximumElasticWorkerCount": 20,
+        "elasticScaleEnabled": "[startsWith(parameters('functionAppSku'), 'EP')]",
+        "maximumElasticWorkerCount": "[if(startsWith(parameters('functionAppSku'), 'EP'), 20, 1)]",
         "isSpot": false,
         "reserved": false,
         "isXenon": false,
