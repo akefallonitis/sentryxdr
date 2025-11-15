@@ -114,7 +114,14 @@
       "Environment": "[parameters('environment')]",
       "CreatedBy": "[parameters('createdByTag')]",
       "ManagedBy": "ARM Template",
-      "Version": "1.0.0"
+      "Version": "1.0.0",
+      "ApplicationName": "SentryXDR",
+      "BusinessUnit": "Security Operations",
+      "CostCenter": "SOC",
+      "DataClassification": "Confidential",
+      "Criticality": "High",
+      "DisasterRecovery": "Required",
+      "MaintenanceWindow": "Sunday 02:00-06:00 UTC"
     }
   },
   "resources": [
